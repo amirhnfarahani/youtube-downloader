@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>YouTube Downloader</title>
+
+    <style>
+    @font-face {
+    font-family: Vazir;
+    src: url("{{ url_for('static', filename='font/Vazir-Regular-FD.woff') }}") format('woff');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: Vazir;
+    src: url("{{ url_for('static', filename='font/Vazir-Bold-FD.woff') }}") format('woff');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+        
+        * {
+            box-sizing: border-box;
+            font-family: vazir;            
+        }
+
+        body {
+            margin: 0;
+
+            min-height: 100vh;
+
+           
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #0f172a,
+                    #111827,
+                    #020617
+                );
+
+            color: white;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+            font-family: vazir;
+        }
+
+
+        .container {
+
+            width: 95%;
+
+            max-width: 850px;
+
+            background: rgba(255,255,255,.06);
+
+            border: 1px solid rgba(255,255,255,.1);
+
+            backdrop-filter: blur(20px);
+
+            border-radius: 25px;
+
+            padding: 40px;
+
+            box-shadow:
+                0 30px 80px rgba(0,0,0,.4);
+               
+            
+        }
+
+
+        h1 {
+
+            text-align: center;
+
+            margin-top: 0;
+
+            font-size: 35px;
+            
+        }
+
+
+        .subtitle {
+
+            text-align: center;
+
+            color: #94a3b8;
+
+            margin-bottom: 35px;
+        }
+
+
+        .input-box {
+
+            display: flex;
+
+            gap: 10px;
+            font-family: 'vazir';
+        }
+
+
+        input {
+
+            flex: 1;
+
+            padding: 18px;
+
+            border-radius: 14px;
+
+            border: 1px solid #334155;
+
+            background: #0f172a;
+
+            color: white;
+
+            outline: none;
+
+            font-size: 15px;
+            font-family: 'vazir';
+        }
+
+
+        input:focus {
+
+            border-color: #ef4444;
+        }
+
+
+        button {
+
+            border: none;
+
+            border-radius: 14px;
+
+            padding: 0 25px;
+
+            cursor: pointer;
+
+            color: white;
+
+            font-weight: bold;
+
+            font-size: 15px;
+            font-family: 'vazir';
+        }
+
+        button:disabled {
+
+            opacity: .5;
+
+            cursor: not-allowed;
+        }
+
+
+        .main-btn {
+
+            background: #ef4444;
+        }
+
+
+        .main-btn:hover {
+
+            background: #dc2626;
+        }
+
+
+        .video-card {
+
+            display: none;
+
+            margin-top: 30px;
+
+            padding: 20px;
+
+            background: rgba(0,0,0,.25);
+
+            border-radius: 20px;
+        }
+
+
+        .video-card img {
+
+            width: 220px;
+
+            border-radius: 14px;
+
+            display: block;
+
+            margin-bottom: 15px;
+        }
+
+
+        .video-title {
+
+            font-size: 18px;
+
+            font-weight: bold;
+
+            margin-bottom: 20px;
+        }
+
+
+        .actions {
+
+            display: flex;
+
+            gap: 10px;
+
+            flex-wrap: wrap;
+        }
+
+
+        .download-btn {
+
+            background: #22c55e;
+
+            padding: 15px 25px;
+        }
+
+
+        .thumbnail-btn {
+
+            background: #6366f1;
+
+            padding: 15px 25px;
+        }
+
+
+        /* Modal */
+
+        .modal {
+
+            display: none;
+
+            position: fixed;
+
+            inset: 0;
+
+            background: rgba(0,0,0,.75);
+
+            align-items: center;
+
+            justify-content: center;
+
+            padding: 20px;
+
+            z-index: 100;
+        }
+
+
+        .modal-content {
+
+            width: 100%;
+
+            max-width: 500px;
+
+            background: #111827;
+
+            border-radius: 25px;
+
+            padding: 30px;
+
+            border: 1px solid #334155;
+        }
+
+
+        .modal-content h2 {
+
+            margin-top: 0;
+        }
+
+
+        .quality-grid {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(2, 1fr);
+
+            gap: 12px;
+
+            margin-top: 25px;
+        }
+
+
+        .quality {
+
+            padding: 20px;
+
+            background: #1e293b;
+
+            border: 1px solid #334155;
+
+            border-radius: 15px;
+
+            cursor: pointer;
+
+            text-align: center;
+
+            transition: .2s;
+        }
+
+
+        .quality:hover {
+
+            background: #334155;
+
+            transform: translateY(-2px);
+        }
+
+
+        .quality strong {
+
+            display: block;
+
+            font-size: 20px;
+
+            margin-bottom: 5px;
+        }
+
+
+        .quality span {
+
+            color: #94a3b8;
+
+            font-size: 13px;
+        }
+
+
+        .quality-empty {
+
+            grid-column: 1 / -1;
+
+            text-align: center;
+
+            color: #94a3b8;
+
+            padding: 15px;
+        }
+
+
+        .close {
+
+            margin-top: 20px;
+
+            width: 100%;
+
+            padding: 15px;
+
+            background: #334155;
+        }
+
+
+        .loading {
+
+            display: none;
+
+            text-align: center;
+
+            margin-top: 20px;
+
+            color: #94a3b8;
+        }
+
+
+
+        /* ================================
+           Luxury Download Progress
+        ================================= */
+
+        .progress-panel {
+            display: none;
+            margin-top: 25px;
+            padding: 22px;
+            border-radius: 20px;
+            background: linear-gradient(145deg, rgba(255,255,255,.08), rgba(255,255,255,.025));
+            border: 1px solid rgba(255,255,255,.10);
+            box-shadow: 0 18px 45px rgba(0,0,0,.25);
+            backdrop-filter: blur(16px);
+            animation: progressIn .35s ease;
+        }
+
+        @keyframes progressIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .progress-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            margin-bottom: 14px;
+        }
+
+        .progress-status {
+            color: #e2e8f0;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .progress-percent {
+            font-size: 20px;
+            font-weight: 700;
+            color: #f8fafc;
+            direction: ltr;
+        }
+
+        .progress-track {
+            height: 12px;
+            padding: 2px;
+            border-radius: 999px;
+            background: rgba(15,23,42,.9);
+            border: 1px solid rgba(255,255,255,.08);
+            overflow: hidden;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,.45);
+        }
+
+        .progress-bar {
+            position: relative;
+            width: 0%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #ef4444, #f97316, #facc15);
+            box-shadow: 0 0 18px rgba(239,68,68,.45);
+            transition: width .35s ease;
+            overflow: hidden;
+        }
+
+        .progress-bar::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                110deg,
+                transparent 20%,
+                rgba(255,255,255,.55) 45%,
+                transparent 70%
+            );
+            transform: translateX(-100%);
+            animation: shine 1.5s infinite;
+        }
+
+        @keyframes shine {
+            to { transform: translateX(100%); }
+        }
+
+        .progress-bar.retrying {
+            animation: retryPulse 1s ease-in-out infinite;
+        }
+
+        @keyframes retryPulse {
+            0%, 100% { opacity: .65; }
+            50% { opacity: 1; }
+        }
+
+        .progress-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 13px;
+            color: #94a3b8;
+            font-size: 12px;
+        }
+
+        .progress-success {
+            color: #86efac !important;
+        }
+
+        .progress-error {
+            color: #fca5a5 !important;
+        }
+
+        .download-btn.downloading,
+        .thumbnail-btn.downloading {
+            pointer-events: none;
+            opacity: .6;
+        }
+
+        /* ================================
+           Responsive Design
+        ================================= */
+        @media (max-width: 900px) {
+            body {
+                padding: 24px 16px;
+            }
+
+            .container {
+                width: 100%;
+                max-width: 760px;
+                padding: 32px;
+            }
+
+            h1 {
+                font-size: 31px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                min-height: 100dvh;
+                padding: 14px 10px;
+                align-items: flex-start;
+            }
+
+            .container {
+                width: 100%;
+                padding: 22px 16px;
+                border-radius: 20px;
+            }
+
+            h1 {
+                font-size: clamp(25px, 7vw, 31px);
+                line-height: 1.35;
+                margin-bottom: 10px;
+            }
+
+            .subtitle {
+                font-size: 12px;
+                line-height: 1.9;
+                margin-bottom: 22px;
+            }
+
+            .input-box {
+                flex-direction: column;
+                gap: 9px;
+            }
+
+            input {
+                width: 100%;
+                min-width: 0;
+                padding: 15px;
+                font-size: 14px;
+            }
+
+            button {
+                min-height: 50px;
+                width: 100%;
+                padding: 13px 16px;
+                font-size: 14px;
+            }
+
+            .video-card {
+                margin-top: 20px;
+                padding: 14px;
+                border-radius: 17px;
+            }
+
+            .video-card img {
+                width: 100%;
+                max-height: 230px;
+                object-fit: cover;
+                margin-bottom: 13px;
+            }
+
+            .video-title {
+                font-size: 15px;
+                line-height: 1.9;
+                margin-bottom: 15px;
+                overflow-wrap: anywhere;
+            }
+
+            .actions {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+
+            .download-btn,
+            .thumbnail-btn {
+                width: 100%;
+                padding: 13px 16px;
+            }
+
+            .progress-panel {
+                margin-top: 18px;
+                padding: 16px;
+                border-radius: 17px;
+            }
+
+            .progress-top {
+                align-items: flex-start;
+                margin-bottom: 11px;
+            }
+
+            .progress-status {
+                max-width: 72%;
+                font-size: 12px;
+                line-height: 1.8;
+            }
+
+            .progress-percent {
+                font-size: 17px;
+                white-space: nowrap;
+            }
+
+            .progress-track {
+                height: 10px;
+            }
+
+            .progress-meta {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 7px 10px;
+                margin-top: 11px;
+                font-size: 10px;
+                line-height: 1.7;
+            }
+
+            .progress-meta span:first-child {
+                grid-column: 1 / -1;
+            }
+
+            .modal {
+                padding: 10px;
+                align-items: flex-end;
+            }
+
+            .modal-content {
+                max-height: 88dvh;
+                overflow-y: auto;
+                padding: 20px 15px;
+                border-radius: 22px 22px 16px 16px;
+            }
+
+            .modal-content h2 {
+                font-size: 18px;
+                line-height: 1.7;
+            }
+
+            .modal-content p {
+                font-size: 11px;
+                line-height: 1.8;
+            }
+
+            .quality-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 8px;
+                margin-top: 17px;
+            }
+
+            .quality {
+                min-width: 0;
+                padding: 15px 8px;
+                border-radius: 13px;
+            }
+
+            .quality strong {
+                font-size: 16px;
+            }
+
+            .quality span {
+                font-size: 10px;
+            }
+
+            .close {
+                margin-top: 12px;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .container {
+                padding: 18px 12px;
+            }
+
+            .quality-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .progress-meta {
+                font-size: 9px;
+            }
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<div class="container">
+
+    <h1>🎬 YouTube Downloader</h1>
+
+    <div class="subtitle">
+        ویدیو، صدا و Thumbnail را با کیفیت دلخواه دانلود کنید
+    </div>
+
+
+    <div class="input-box">
+
+        <input
+            id="url"
+            type="text"
+            placeholder="لینک YouTube را وارد کنید..."
+        >
+
+        <button
+            class="main-btn"
+            id="checkBtn"
+            onclick="getVideoInfo()"
+        >
+            بررسی لینک
+        </button>
+
+    </div>
+
+
+    <div
+        class="loading"
+        id="loading"
+    >
+        در حال دریافت اطلاعات...
+    </div>
+
+
+
+    <div class="progress-panel" id="progressPanel">
+        <div class="progress-top">
+            <div class="progress-status" id="progressStatus">
+                در حال آماده‌سازی دانلود...
+            </div>
+            <div class="progress-percent" id="progressPercent">0%</div>
+        </div>
+
+        <div class="progress-track">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <div class="progress-meta">
+            <span id="progressDownloaded">0 MB / —</span>
+            <span id="progressSpeed">سرعت: —</span>
+            <span id="progressEta">زمان باقی‌مانده: —</span>
+        </div>
+    </div>
+
+
+    <div
+        class="video-card"
+        id="videoCard"
+    >
+
+        <img
+            id="thumbnail"
+            src=""
+            alt="Thumbnail"
+        >
+
+        <div
+            class="video-title"
+            id="videoTitle"
+        ></div>
+
+
+        <div class="actions">
+
+            <button
+                class="download-btn"
+                id="openModalBtn"
+                onclick="openQualityModal()"
+            >
+                ⬇ دانلود ویدیو
+            </button>
+
+
+            <button
+                class="thumbnail-btn"
+                onclick="downloadThumbnail()"
+            >
+                🖼 دانلود Thumbnail
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- Quality Modal -->
+
+<div
+    class="modal"
+    id="qualityModal"
+>
+
+    <div class="modal-content">
+
+        <h2>کیفیت دانلود را انتخاب کنید</h2>
+
+        <p style="color:#94a3b8">
+            کیفیت‌های زیر بر اساس فرمت‌های واقعی موجود برای همین ویدیو نمایش داده شده‌اند:
+        </p>
+
+
+        <div
+            class="quality-grid"
+            id="qualityGrid"
+        >
+
+            <div class="quality-empty">
+                در حال بررسی کیفیت‌های موجود...
+            </div>
+
+        </div>
+
+
+        <button
+            class="close"
+            onclick="closeQualityModal()"
+        >
+            بستن
+        </button>
+
+    </div>
+
+</div>
+
+
+<script>
+
+let currentURL = "";
+
+
+/* ----------------------------------
+   استخراج نام فایل از هدر پاسخ سرور
+---------------------------------- */
+
+function filenameFromResponse(response, fallback) {
+
+    const disposition = response.headers.get(
+        "Content-Disposition"
+    );
+
+    if (!disposition) {
+        return fallback;
+    }
+
+    // ابتدا فرمت filename*=UTF-8''... را بررسی می‌کند (نام‌های فارسی)
+    let match = disposition.match(
+        /filename\*=UTF-8''([^;]+)/i
+    );
+
+    if (match && match[1]) {
+        try {
+            return decodeURIComponent(match[1]);
+        } catch (e) {
+            /* ادامه به حالت بعدی */
+        }
+    }
+
+    // در غیر این صورت فرمت ساده filename="..." را بررسی می‌کند
+    match = disposition.match(
+        /filename="?([^";]+)"?/i
+    );
+
+    if (match && match[1]) {
+        return match[1];
+    }
+
+    return fallback;
+
+}
+
+
+/* ----------------------------------
+   دریافت اطلاعات ویدیو
+---------------------------------- */
+
+async function getVideoInfo() {
+
+    const url =
+        document.getElementById("url").value.trim();
+
+
+    if (!url) {
+
+        alert("لطفاً لینک YouTube را وارد کنید.");
+
+        return;
+    }
+
+
+    currentURL = url;
+
+
+    document.getElementById("checkBtn").disabled = true;
+
+    document.getElementById(
+        "loading"
+    ).textContent = "در حال دریافت اطلاعات...";
+
+    document.getElementById(
+        "loading"
+    ).style.display = "block";
+
+
+    document.getElementById(
+        "videoCard"
+    ).style.display = "none";
+
+
+    try {
+
+        const response = await fetch(
+            "/info",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
+
+                body: JSON.stringify({
+                    url: url
+                })
+            }
+        );
+
+
+        const data = await response.json();
+
+
+        if (!response.ok || !data.success) {
+
+            alert(data.error || "خطا در دریافت اطلاعات ویدیو.");
+
+            return;
+        }
+
+
+        document.getElementById(
+            "thumbnail"
+        ).src = data.thumbnail;
+
+
+        document.getElementById(
+            "videoTitle"
+        ).textContent = data.title;
+
+
+        document.getElementById(
+            "videoCard"
+        ).style.display = "block";
+
+
+    } catch (error) {
+
+        alert(
+            "خطا در اتصال به سرور."
+        );
+
+    } finally {
+
+        document.getElementById("checkBtn").disabled = false;
+
+        document.getElementById(
+            "loading"
+        ).style.display = "none";
+    }
+
+}
+
+
+/* ----------------------------------
+   باز کردن Modal + دریافت کیفیت‌های واقعی موجود
+---------------------------------- */
+
+async function openQualityModal() {
+
+    const grid = document.getElementById("qualityGrid");
+
+    grid.innerHTML =
+        '<div class="quality-empty">در حال بررسی کیفیت‌های موجود...</div>';
+
+    document.getElementById(
+        "qualityModal"
+    ).style.display = "flex";
+
+
+    try {
+
+        const response = await fetch(
+            "/formats",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
+
+                body: JSON.stringify({
+                    url: currentURL
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+
+            grid.innerHTML =
+                '<div class="quality-empty">'
+                + (data.error || "کیفیتی برای این ویدیو پیدا نشد.")
+                + '</div>';
+
+            return;
+        }
+
+        renderQualityOptions(data.qualities, data.has_audio);
+
+    } catch (error) {
+
+        grid.innerHTML =
+            '<div class="quality-empty">خطا در دریافت کیفیت‌های ویدیو.</div>';
+
+    }
+
+}
+
+
+/* ----------------------------------
+   ساخت دکمه‌های کیفیت بر اساس داده واقعی
+---------------------------------- */
+
+function renderQualityOptions(qualities, hasAudio) {
+
+    const grid = document.getElementById("qualityGrid");
+
+    grid.innerHTML = "";
+
+    if (!qualities || qualities.length === 0) {
+
+        grid.innerHTML =
+            '<div class="quality-empty">کیفیت ویدیویی برای این لینک پیدا نشد.</div>';
+
+    } else {
+
+        qualities.forEach(function (q) {
+
+            const div = document.createElement("div");
+
+            div.className = "quality";
+
+            div.onclick = function () {
+                downloadVideo(q.value);
+            };
+
+            div.innerHTML =
+                "<strong>" + q.label + "</strong>"
+                + "<span>" + q.resolution + "</span>";
+
+            grid.appendChild(div);
+
+        });
+
+    }
+
+    if (hasAudio) {
+
+        const audioDiv = document.createElement("div");
+
+        audioDiv.className = "quality";
+
+        audioDiv.onclick = function () {
+            downloadVideo("audio");
+        };
+
+        audioDiv.innerHTML =
+            "<strong>MP3</strong>"
+            + "<span>Audio 320kbps</span>";
+
+        grid.appendChild(audioDiv);
+
+    }
+
+}
+
+
+/* ----------------------------------
+   بستن Modal
+---------------------------------- */
+
+function closeQualityModal() {
+
+    document.getElementById(
+        "qualityModal"
+    ).style.display = "none";
+
+}
+
+
+/* ----------------------------------
+   دانلود ویدیو
+---------------------------------- */
+
+async function downloadVideo(quality) {
+
+    closeQualityModal();
+
+    const panel = document.getElementById("progressPanel");
+    const bar = document.getElementById("progressBar");
+    const percent = document.getElementById("progressPercent");
+    const status = document.getElementById("progressStatus");
+    const downloaded = document.getElementById("progressDownloaded");
+    const speed = document.getElementById("progressSpeed");
+    const eta = document.getElementById("progressEta");
+    const downloadBtn = document.getElementById("openModalBtn");
+
+    panel.style.display = "block";
+    bar.style.width = "0%";
+    bar.style.background = "linear-gradient(90deg, #ef4444, #f97316, #facc15)";
+    percent.textContent = "0%";
+    status.textContent = "در حال آماده‌سازی دانلود...";
+    status.className = "progress-status";
+    downloaded.textContent = "0 MB / —";
+    speed.textContent = "سرعت: —";
+    eta.textContent = "زمان باقی‌مانده: —";
+    downloadBtn.classList.add("downloading");
+    downloadBtn.disabled = true;
+
+    try {
+
+        const response = await fetch("/download", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                url: currentURL,
+                quality: quality
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || "خطا در شروع دانلود.");
+        }
+
+        await monitorDownload(data.job_id);
+
+    } catch (error) {
+
+        status.textContent = error.message || "خطا هنگام دانلود.";
+        status.className = "progress-status progress-error";
+        bar.style.background = "linear-gradient(90deg, #ef4444, #b91c1c)";
+
+    } finally {
+
+        downloadBtn.classList.remove("downloading");
+        downloadBtn.disabled = false;
+    }
+}
+
+
+async function monitorDownload(jobId) {
+
+    const panel = document.getElementById("progressPanel");
+    const bar = document.getElementById("progressBar");
+    const percent = document.getElementById("progressPercent");
+    const status = document.getElementById("progressStatus");
+    const downloaded = document.getElementById("progressDownloaded");
+    const speed = document.getElementById("progressSpeed");
+    const eta = document.getElementById("progressEta");
+
+    let pollingFailures = 0;
+    const MAX_POLLING_FAILURES = 12;
+
+    while (true) {
+        try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
+
+            const response = await fetch(
+                "/progress/" + encodeURIComponent(jobId),
+                {
+                    cache: "no-store",
+                    signal: controller.signal
+                }
+            );
+
+            clearTimeout(timeout);
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || "ارتباط با وضعیت دانلود قطع شد.");
+            }
+
+            pollingFailures = 0;
+
+            const value = Math.max(0, Math.min(100, Number(data.percent || 0)));
+
+            bar.style.width = value + "%";
+            percent.textContent = Math.round(value) + "%";
+            status.textContent = data.message || "در حال دانلود...";
+            status.className = "progress-status";
+            downloaded.textContent =
+                (data.downloaded || "0 MB") + " / " + (data.total || "—");
+            speed.textContent = "سرعت: " + (data.speed || "—");
+            eta.textContent = "زمان باقی‌مانده: " + (data.eta || "—");
+
+            if (data.retrying || data.status === "retrying") {
+                status.textContent = data.message || "اتصال ناپایدار؛ در حال تلاش مجدد...";
+                speed.textContent = "وضعیت: تلاش مجدد";
+                bar.classList.add("retrying");
+            } else {
+                bar.classList.remove("retrying");
+            }
+
+            if (data.status === "processing") {
+                bar.style.width = "99%";
+                status.textContent = data.message || "در حال پردازش و آماده‌سازی فایل...";
+                speed.textContent = "وضعیت: پردازش";
+            }
+
+            if (data.status === "ready") {
+                bar.classList.remove("retrying");
+                bar.style.width = "100%";
+                percent.textContent = "100%";
+                status.textContent = "✓ دانلود با موفقیت انجام شد";
+                status.className = "progress-status progress-success";
+                eta.textContent = "آماده دانلود";
+                panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+                const a = document.createElement("a");
+                a.href = data.download_url;
+                a.download = data.filename || "download";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                return;
+            }
+
+            if (data.status === "error") {
+                throw new Error(data.error || "دانلود ناموفق بود.");
+            }
+
+            // در حالت retrying کمی بیشتر صبر می‌کنیم تا سرور فرصت reconnect داشته باشد.
+            await new Promise(resolve =>
+                setTimeout(resolve, data.retrying ? 1800 : 650)
+            );
+
+        } catch (error) {
+            pollingFailures++;
+
+            // قطعی کوتاه‌مدت مرورگر/شبکه نباید progress bar را فوراً خراب کند.
+            if (pollingFailures <= MAX_POLLING_FAILURES) {
+                status.textContent = "ارتباط با سرور موقتاً قطع شد؛ در حال اتصال مجدد...";
+                status.className = "progress-status";
+                speed.textContent = "وضعیت: اتصال مجدد";
+                eta.textContent = "لطفاً صبر کنید...";
+                bar.classList.add("retrying");
+
+                await new Promise(resolve => setTimeout(resolve, 1800));
+                continue;
+            }
+
+            throw new Error(
+                "ارتباط با سرور دانلود برقرار نشد. لطفاً صفحه را تازه کنید و دوباره تلاش کنید."
+            );
+        }
+    }
+}
+
+
+/* ----------------------------------
+   دانلود Thumbnail
+---------------------------------- */
+
+async function downloadThumbnail() {
+
+    document.getElementById(
+        "loading"
+    ).textContent =
+        "در حال دانلود Thumbnail...";
+
+
+    document.getElementById(
+        "loading"
+    ).style.display = "block";
+
+
+    try {
+
+        const response = await fetch(
+            "/thumbnail",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
+
+                body: JSON.stringify({
+
+                    url: currentURL
+
+                })
+            }
+        );
+
+
+        if (!response.ok) {
+
+            const error =
+                await response.json();
+
+            alert(error.error || "خطا در دانلود Thumbnail.");
+
+            return;
+        }
+
+
+        const blob =
+            await response.blob();
+
+
+        const downloadURL =
+            window.URL.createObjectURL(blob);
+
+
+        const a =
+            document.createElement("a");
+
+
+        a.href = downloadURL;
+
+        a.download = filenameFromResponse(
+            response,
+            "youtube-thumbnail"
+        );
+
+
+        document.body.appendChild(a);
+
+        a.click();
+
+        a.remove();
+
+
+        window.URL.revokeObjectURL(
+            downloadURL
+        );
+
+
+    } catch (error) {
+
+        alert(
+            "خطا هنگام دانلود Thumbnail."
+        );
+
+    } finally {
+
+        document.getElementById(
+            "loading"
+        ).style.display = "none";
+    }
+
+}
+
+</script>
+
+
+</body>
+
+</html>
