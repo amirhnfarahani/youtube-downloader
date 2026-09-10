@@ -1,110 +1,326 @@
-# YouTube Downloader — Flask + yt-dlp
+# YouTube Downloader — Vue + Flask + yt-dlp
 
-A lightweight RTL Persian YouTube downloader built with **Flask**, **yt-dlp**, HTML/CSS and vanilla JavaScript.
+A modern, responsive and self-hosted YouTube downloader with a **Vue.js frontend**, **Flask backend** and **yt-dlp** download engine. The interface is Persian (RTL), mobile-friendly and designed for fast local use.
 
-## Features
+> ⚠️ Use this project only for content you are legally allowed to download. Respect YouTube's Terms of Service and copyright laws.
 
-- Responsive UI for desktop, tablet and mobile
-- Fetch video title and thumbnail before downloading
-- Detect available video qualities dynamically
-- Download video or MP3
-- Luxury glassmorphism download progress panel
-- Real-time percentage, downloaded size, speed and ETA
-- Automatic retry for common network/DNS/timeout failures
-- Server-side retry + yt-dlp internal retries
-- Front-end polling recovery when the browser temporarily loses connection to Flask
-- Friendly Persian error messages for common DNS/network/FFmpeg problems
-- Automatic final file download after completion
+## ✨ Features
 
-## Project structure
+### Download
+
+- 🎬 Download YouTube videos in the selected quality
+- 🎵 Download audio as MP3
+- 📺 Support for YouTube videos, Shorts and Playlists
+- 📋 Paste YouTube links directly from the Clipboard
+- 🖼️ Download video thumbnails
+- 🔎 Fetch video title, thumbnail, uploader and duration before downloading
+- 🎚️ Dynamic quality detection
+- ⭐ Best-quality download option
+- 📦 Automatic video/audio merging through FFmpeg
+
+### Playlist
+
+- Detect Playlist URLs
+- Load playlist information and video thumbnails
+- Select individual videos
+- Select all / clear all
+- Queue selected videos for download
+
+### Download manager
+
+- 📊 Real-time download progress
+- ⚡ Download speed and ETA
+- 📦 Downloaded/total size information
+- ⏳ Queue and active download states
+- ❌ Cancel running downloads
+- 🔄 Retry failed downloads
+- 🔌 Connection/retry status when the progress stream becomes stale
+- Automatic server-side retry with exponential backoff
+- Continued downloads when supported by yt-dlp
+- Up to 2 concurrent downloads by default
+
+### History & presets
+
+- 🕘 Persistent download history using SQLite
+- 🔍 Search downloaded items
+- 🗑️ Delete individual history entries
+- 🧹 Clear download history
+- ⚡ Save reusable download presets
+- One-click preset selection
+
+### Settings & UI
+
+- 🌙 Dark / light theme
+- 📁 Configurable download directory
+- 🚦 Configurable concurrent download count
+- 🚀 Optional download speed limit
+- 🔔 Download notification setting
+- 📋 Clipboard monitor setting
+- 🇮🇷 Persian RTL interface
+- 📱 Responsive desktop, tablet and mobile layout
+- 🎨 Modern glassmorphism-inspired UI
+- Icons powered by Lucide Vue
+
+### Network & error handling
+
+The backend contains multiple recovery layers for unstable connections:
+
+1. yt-dlp retries HTTP requests, fragments and extraction operations.
+2. Flask applies application-level retries for common network/DNS/timeout failures.
+3. Exponential backoff is used between retry attempts.
+4. The Vue frontend continues polling the progress endpoint through short connection failures.
+5. Stale download progress is reported as a reconnect/retry state instead of appearing frozen.
+6. Common DNS, timeout, FFmpeg and unavailable-format errors are converted into readable Persian messages.
+
+A persistent DNS problem cannot be fixed by the downloader itself. If `googlevideo.com` cannot be resolved, check the system's internet connection, DNS, VPN or Proxy configuration.
+
+## 🧱 Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | Vue 3 |
+| Build tool | Vite |
+| Icons | Lucide Vue Next |
+| Backend | Python + Flask |
+| Downloader engine | yt-dlp |
+| Media processing | FFmpeg |
+| Database | SQLite |
+| UI direction | Persian / RTL |
+
+## 📁 Project Structure
 
 ```text
-downloader/
+youtube-downloader/
 ├── app.py
 ├── requirements.txt
 ├── README.md
 ├── .gitignore
-├── templates/
-│   └── index.html
-├── static/
-│   └── font/
-│       ├── Vazir-Regular-FD.woff
-│       └── Vazir-Bold-FD.woff
-└── downloads/
+├── downloader.db              # Created automatically at runtime
+├── downloads/                 # Downloaded files
+├── frontend/
+│   ├── package.json
+│   ├── vite.config.js
+│   ├── index.html
+│   └── src/
+│       ├── App.vue
+│       ├── main.js
+│       └── ...
+└── static/
+    └── font/
+        ├── Vazir-Regular-FD.woff
+        └── Vazir-Bold-FD.woff
 ```
 
-`downloads/` is created automatically when the application starts.
+`downloads/` and `downloader.db` are generated/used locally by the application.
 
-## Requirements
+## 💻 Requirements
 
-- Python 3.10+ recommended
-- FFmpeg is required for formats that need video/audio merging and for MP3 extraction
-- A working internet connection
+- Python 3.10+
+- Node.js 18+ recommended
+- npm
+- FFmpeg
+- Internet connection
 
-## Installation
+FFmpeg is required when the selected format needs separate video/audio streams to be merged and when extracting MP3 audio.
 
-### Windows PowerShell
+## 🚀 Installation
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/amirhosein126/youtube-downloader.git
+cd youtube-downloader
+```
+
+### 2. Create the Python environment
+
+#### Windows PowerShell
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-python app.py
 ```
 
-Open:
-
-```text
-http://127.0.0.1:5000
-```
-
-### If PowerShell blocks activation
-
-You can run the environment's Python directly:
+If PowerShell blocks virtual-environment activation, run the environment's Python directly:
 
 ```powershell
 .\.venv\Scripts\python.exe app.py
 ```
 
-## FFmpeg
+### 3. Install the Vue frontend dependencies
 
-Install FFmpeg and make sure `ffmpeg` is available in your system `PATH`.
+Open another terminal:
+
+```bash
+cd frontend
+npm install
+```
+
+## ▶️ Development
+
+You need to run the Flask backend and Vue development server.
+
+### Terminal 1 — Flask
+
+From the project root:
+
+```bash
+python app.py
+```
+
+Backend:
+
+```text
+http://127.0.0.1:5000
+```
+
+### Terminal 2 — Vue / Vite
+
+From the `frontend` directory:
+
+```bash
+npm run dev
+```
+
+Vite runs on:
+
+```text
+http://127.0.0.1:5173
+```
+
+The Vite development server proxies `/api` requests to the Flask server at `http://127.0.0.1:5000`.
+
+## 📦 Production Frontend Build
+
+Build the Vue application with:
+
+```bash
+cd frontend
+npm run build
+```
+
+The production files are generated in:
+
+```text
+frontend/dist/
+```
+
+The Flask application is configured to use this directory for the built frontend. For production deployment, use a proper WSGI server instead of Flask's development server.
+
+## 🎞️ FFmpeg Setup
+
+Make sure `ffmpeg` is installed and available in the system `PATH`.
 
 Test it with:
 
-```powershell
+```bash
 ffmpeg -version
 ```
 
-If `ffmpeg` is not found, downloads that require merging separate video/audio streams or MP3 extraction may fail.
+If the command is not recognized, downloads requiring video/audio merging or MP3 conversion may fail.
 
-## Network/DNS retry behavior
+## 🔌 API Endpoints
 
-The downloader uses multiple layers of recovery:
+The Flask backend exposes a JSON API used by the Vue frontend.
 
-1. **yt-dlp retries** for HTTP, fragments and extractor operations.
-2. **Application-level retries** for common network/DNS/timeout failures.
-3. **Exponential backoff** between application-level attempts.
-4. The browser keeps polling the progress endpoint through short connection failures instead of immediately marking the download as failed.
-5. If the backend has not reported a progress hook for a while, the UI displays a reconnect/retry state instead of looking frozen.
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/health` | Backend, yt-dlp, FFmpeg and disk status |
+| POST | `/api/info` | Get video information and available qualities |
+| POST | `/api/playlist` | Read playlist entries |
+| POST | `/api/download` | Start a video/audio download |
+| GET | `/api/progress/<job_id>` | Get download progress |
+| POST | `/api/cancel/<job_id>` | Cancel a download |
+| POST | `/api/retry/<job_id>` | Retry a failed job |
+| GET | `/api/file/<job_id>` | Download the completed file |
+| POST | `/api/thumbnail` | Download the video thumbnail |
+| GET | `/api/history` | Get download history |
+| DELETE | `/api/history/<item_id>` | Delete one history item and its file |
+| DELETE | `/api/history` | Clear history |
+| GET | `/api/settings` | Read application settings |
+| PUT | `/api/settings` | Update application settings |
+| GET | `/api/presets` | Get saved presets |
+| POST | `/api/presets` | Create a preset |
+| DELETE | `/api/presets/<preset_id>` | Delete a preset |
 
-A persistent DNS failure cannot be solved purely in code. If the machine cannot resolve `googlevideo.com`, check your internet connection, DNS settings and VPN/Proxy configuration.
+## 🗃️ Local Database
 
-## GitHub
+The backend uses SQLite and creates `downloader.db` automatically.
 
-Before pushing the project, make sure generated downloads, virtual environments and Python cache files are ignored by Git. The included `.gitignore` handles these common files.
+The database stores:
+
+- Download history
+- Presets
+- Application settings
+
+No external database server is required.
+
+## 🛠️ Troubleshooting
+
+### FFmpeg is not found
+
+Run:
 
 ```bash
-git init
-git add .
-git commit -m "Initial responsive YouTube downloader"
-git branch -M main
-git remote add origin YOUR_GITHUB_REPOSITORY_URL
-git push -u origin main
+ffmpeg -version
 ```
 
-## Notes
+If it fails, install FFmpeg and add its `bin` directory to the system `PATH`.
 
-- This project is intended for local/personal use.
-- Respect YouTube's terms, copyright rules and the rights of content owners when downloading content.
-- `debug=True` is enabled for local development. Use a production WSGI server for deployment.
+### DNS / `googlevideo.com` errors
+
+Check:
+
+- Internet connection
+- DNS configuration
+- VPN / Proxy
+- Firewall or network restrictions
+
+The application already retries common DNS and network failures, but it cannot resolve a DNS problem that exists outside the application.
+
+### Download progress appears stuck
+
+The frontend polls `/api/progress/<job_id>` continuously. If the backend stops reporting progress for the configured stale interval, the job is shown as reconnecting/retrying instead of immediately being marked as failed.
+
+### A selected quality is unavailable
+
+YouTube formats can change between videos. Use **Best Quality** or choose another available resolution from the quality selector.
+
+## 🧪 Development Commands
+
+### Frontend
+
+```bash
+cd frontend
+npm run dev
+npm run build
+npm run preview
+```
+
+### Backend
+
+```bash
+python app.py
+```
+
+## 🔒 Privacy
+
+This project is designed for local/self-hosted use. Download history, settings and presets are stored in the local SQLite database, while downloaded files are stored in the configured local download directory.
+
+## 📌 Notes
+
+- The project is intended primarily for local and personal use.
+- Do not use it to download content you do not have permission to copy or store.
+- Flask's development server should not be exposed directly to the public internet in production.
+- Generated downloads, the SQLite database, virtual environments and Python cache files should remain excluded from Git.
+
+## 📄 License
+
+See the repository license file for the project's current license information.
+
+## 👨‍💻 Author
+
+Developed by **Amirhosein126**.
+
+GitHub: https://github.com/amirhosein126/youtube-downloader
