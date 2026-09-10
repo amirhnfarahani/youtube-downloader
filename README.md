@@ -2,21 +2,19 @@
 
 A modern, responsive and self-hosted YouTube downloader with a **Vue.js frontend**, **Flask backend** and **yt-dlp** download engine. The interface is Persian (RTL), mobile-friendly and designed for fast local use.
 
-> ⚠️ Use this project only for content you are legally allowed to download. Respect YouTube's Terms of Service and copyright laws.
-
 ## ✨ Features
 
 ### Download
 
 - 🎬 Download YouTube videos in the selected quality
-- 🎵 Download audio as MP3
-- 📺 Support for YouTube videos, Shorts and Playlists
-- 📋 Paste YouTube links directly from the Clipboard
-- 🖼️ Download video thumbnails
-- 🔎 Fetch video title, thumbnail, uploader and duration before downloading
-- 🎚️ Dynamic quality detection
-- ⭐ Best-quality download option
-- 📦 Automatic video/audio merging through FFmpeg
+-  Download audio as MP3
+-  Support for YouTube videos, Shorts and Playlists
+-  Paste YouTube links directly from the Clipboard
+-  Download video thumbnails
+-  Fetch video title, thumbnail, uploader and duration before downloading
+-  Dynamic quality detection
+-  Best-quality download option
+-  Automatic video/audio merging through FFmpeg
 
 ### Playlist
 
