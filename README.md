@@ -319,6 +319,6 @@ See the repository license file for the project's current license information.
 
 ## 👨‍💻 Author
 
-Developed by **Amirhosein126**.
+Developed by **amirhnfarahani**.
 
 GitHub: https://github.com/amirhosein126/youtube-downloader
