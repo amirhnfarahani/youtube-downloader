@@ -11,6 +11,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 import urllib.request
 import yt_dlp
+from flask import Flask, jsonify, request, send_file, send_from_directory
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, 'downloads')
@@ -119,9 +120,13 @@ def api_playlist():
 def download_options(job_id,url,quality,media_type):
     s=get_settings(); folder=s['download_path'] or DOWNLOAD_FOLDER; os.makedirs(folder,exist_ok=True); outtmpl=os.path.join(folder,f'{job_id}.%(ext)s')
     if media_type=='audio': fmt='bestaudio/best'
-    elif quality=='best': fmt='bestvideo+bestaudio/best'
+    elif quality=='best': fmt='bestvideo*+bestaudio/best'
     else:
-        h=int(quality); fmt=f'bestvideo[height<={h}]+bestaudio/best[height<={h}]'
+        try:
+            h=max(144,int(quality))
+        except (TypeError,ValueError):
+            h=1080
+        fmt=f'bestvideo[height<={h}]+bestaudio/best[height<={h}]/best[height<={h}]/best'
     def hook(d):
         if CANCEL_EVENTS[job_id].is_set(): raise RuntimeError('DOWNLOAD_CANCELLED')
         if d.get('status')=='downloading':
@@ -176,9 +181,13 @@ def run_download(job_id,url,quality,media_type='video'):
             source=max(files,key=os.path.getmtime); ext=os.path.splitext(source)[1] or ('.mp3' if media_type=='audio' else '.mp4')
             base=clean_title(title)
             with FILE_NAME_LOCK:
-                filename=base+ext; destination=os.path.join(folder,filename); counter=1
+                filename=base+ext
+                destination=os.path.join(folder,filename)
+                counter=1
                 while os.path.exists(destination):
-                    filename=f'{base}_{counter}{ext}'; destination=os.path.join(folder,filename); counter+=1
+                    filename=f'{base}_{counter}{ext}'
+                    destination=os.path.join(folder,filename)
+                    counter+=1
                 os.replace(source,destination)
             size=os.path.getsize(destination)
             c=db(); c.execute('INSERT INTO history(title,url,filename,path,status,media_type,quality,size,created_at) VALUES(?,?,?,?,?,?,?,?,?)',(title,url,os.path.basename(destination),destination,'completed',media_type,quality,size,time.time())); c.commit(); c.close()
