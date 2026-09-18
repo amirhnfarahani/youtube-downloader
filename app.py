@@ -9,6 +9,7 @@ import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+import urllib.request
 import yt_dlp
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -18,9 +19,12 @@ STATIC_FOLDER = os.path.join(BASE_DIR, 'static')
 DB_PATH = os.path.join(BASE_DIR, 'downloader.db')
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 app = Flask(__name__, static_folder=None)
-MAX_RETRIES, STALE_SECONDS, MAX_WORKERS = 5, 12, 2
+MAX_RETRIES, STALE_SECONDS, MAX_WORKERS = 5, 12, 5
 JOBS, JOBS_LOCK, CANCEL_EVENTS = {}, threading.RLock(), {}
 EXECUTOR = ThreadPoolExecutor(max_workers=MAX_WORKERS)
+DOWNLOAD_CONDITION = threading.Condition(JOBS_LOCK)
+ACTIVE_DOWNLOADS = 0
+FILE_NAME_LOCK = threading.Lock()
 
 
 def db():
@@ -92,7 +96,10 @@ def api_info():
     url=str((request.get_json(silent=True) or {}).get('url','')).strip()
     if not url:return jsonify(success=False,error='لینک را وارد کنید.'),400
     try:
-        info=extract(url); formats=info.get('formats') or []; heights=sorted({int(f['height']) for f in formats if f.get('height') and f.get('vcodec')!='none'},reverse=True)
+        is_playlist=bool(re.search(r'[?&](list|playlist)=',url,re.I) or '/playlist' in url.lower())
+        info=extract(url,playlist=is_playlist)
+        formats=info.get('formats') or []
+        heights=sorted({int(f['height']) for f in formats if f.get('height') and f.get('vcodec')!='none'},reverse=True)
         return jsonify(success=True,kind='playlist' if info.get('_type')=='playlist' else 'video',title=info.get('title'),thumbnail=info.get('thumbnail'),duration=info.get('duration'),uploader=info.get('uploader'),webpage_url=info.get('webpage_url',url),qualities=[{'value':str(h),'resolution':f'{h}p','label':'4K' if h>=2160 else '2K' if h>=1440 else 'Full HD' if h>=1080 else 'HD' if h>=720 else 'SD'} for h in heights])
     except Exception as e:return jsonify(success=False,error=human_error(e)),500
 
@@ -127,27 +134,69 @@ def download_options(job_id,url,quality,media_type):
     return opts,folder
 
 
+def acquire_download_slot(job_id):
+    global ACTIVE_DOWNLOADS
+    while True:
+        with DOWNLOAD_CONDITION:
+            if CANCEL_EVENTS.get(job_id) and CANCEL_EVENTS[job_id].is_set(): return False
+            limit=max(1,min(5,int(get_settings().get('concurrent_downloads',2))))
+            if ACTIVE_DOWNLOADS < limit:
+                ACTIVE_DOWNLOADS += 1
+                return True
+            set_job(job_id,status='queued',message=f'در صف دانلود؛ ظرفیت همزمان {limit} است...')
+            DOWNLOAD_CONDITION.wait(timeout=1)
+
+def release_download_slot():
+    global ACTIVE_DOWNLOADS
+    with DOWNLOAD_CONDITION:
+        ACTIVE_DOWNLOADS=max(0,ACTIVE_DOWNLOADS-1)
+        DOWNLOAD_CONDITION.notify_all()
+
+def cleanup_job_files(folder,job_id):
+    for p in glob.glob(os.path.join(folder,f'{job_id}.*')):
+        try:
+            if os.path.isfile(p): os.remove(p)
+        except OSError: pass
+
 def run_download(job_id,url,quality,media_type='video'):
     event=CANCEL_EVENTS[job_id]; last_error=None
     for attempt in range(1,MAX_RETRIES+1):
+        slot_acquired=False
         if event.is_set(): set_job(job_id,status='cancelled',message='دانلود لغو شد.',connection_state='cancelled'); return
         try:
+            if not acquire_download_slot(job_id):
+                set_job(job_id,status='cancelled',message='دانلود لغو شد.',connection_state='cancelled')
+                return
+            slot_acquired=True
             set_job(job_id,status='starting',retry_count=attempt-1,message='در حال اتصال به YouTube...',connection_state='connecting')
             info=extract(url); title=info.get('title') or 'video'; opts,folder=download_options(job_id,url,quality,media_type)
             with yt_dlp.YoutubeDL(opts) as ydl: ydl.extract_info(url,download=True)
             files=[f for f in glob.glob(os.path.join(folder,job_id+'.*')) if not f.endswith('.part')]
             if not files: raise RuntimeError('فایل خروجی پیدا نشد')
-            source=max(files,key=os.path.getmtime); ext=os.path.splitext(source)[1]; filename=clean_title(title)+ext; destination=os.path.join(folder,filename); counter=1
-            while os.path.exists(destination): destination=os.path.join(folder,f'{clean_title(title)}_{counter}{ext}'); counter+=1
-            os.replace(source,destination); size=os.path.getsize(destination)
+            source=max(files,key=os.path.getmtime); ext=os.path.splitext(source)[1] or ('.mp3' if media_type=='audio' else '.mp4')
+            base=clean_title(title)
+            with FILE_NAME_LOCK:
+                filename=base+ext; destination=os.path.join(folder,filename); counter=1
+                while os.path.exists(destination):
+                    filename=f'{base}_{counter}{ext}'; destination=os.path.join(folder,filename); counter+=1
+                os.replace(source,destination)
+            size=os.path.getsize(destination)
             c=db(); c.execute('INSERT INTO history(title,url,filename,path,status,media_type,quality,size,created_at) VALUES(?,?,?,?,?,?,?,?,?)',(title,url,os.path.basename(destination),destination,'completed',media_type,quality,size,time.time())); c.commit(); c.close()
             set_job(job_id,status='completed',percent=100,downloaded=format_bytes(size),total=format_bytes(size),speed='—',eta='—',message='دانلود با موفقیت انجام شد.',filename=os.path.basename(destination),file_path=destination,connection_state='completed'); return
         except Exception as e:
             last_error=e
-            if event.is_set() or str(e)=='DOWNLOAD_CANCELLED': set_job(job_id,status='cancelled',message='دانلود لغو شد.',connection_state='cancelled'); return
+            if event.is_set() or str(e)=='DOWNLOAD_CANCELLED':
+                cleanup_job_files(get_settings().get('download_path') or DOWNLOAD_FOLDER,job_id)
+                set_job(job_id,status='cancelled',message='دانلود لغو شد.',connection_state='cancelled')
+                return
             if attempt<MAX_RETRIES:
-                wait=min(10,2**(attempt-1)); set_job(job_id,status='retrying',retry_count=attempt,message=f'خطا؛ تلاش مجدد در {wait} ثانیه...',error=human_error(e),retrying=True,connection_state='retrying'); time.sleep(wait)
+                wait=min(10,2**(attempt-1))
+                set_job(job_id,status='retrying',retry_count=attempt,message=f'خطا؛ تلاش مجدد در {wait} ثانیه...',error=human_error(e),retrying=True,connection_state='retrying')
+                time.sleep(wait)
             else: break
+        finally:
+            if slot_acquired: release_download_slot()
+    cleanup_job_files(get_settings().get('download_path') or DOWNLOAD_FOLDER,job_id)
     set_job(job_id,status='error',message='دانلود ناموفق بود.',error=human_error(last_error),connection_state='failed')
 
 
@@ -155,7 +204,7 @@ def run_download(job_id,url,quality,media_type='video'):
 def api_download():
     d=request.get_json(silent=True) or {}; url=str(d.get('url','')).strip(); quality=str(d.get('quality','best')); media_type=str(d.get('media_type','video'))
     if not url:return jsonify(success=False,error='لینک وارد نشده است.'),400
-    job_id=str(uuid.uuid4()); JOBS[job_id]={'id':job_id,'url':url,'quality':quality,'media_type':media_type,'status':'queued','percent':0,'message':'در صف دانلود...','created_at':time.time()}; CANCEL_EVENTS[job_id]=threading.Event(); EXECUTOR.submit(run_download,job_id,url,quality,media_type); return jsonify(success=True,job_id=job_id)
+    job_id=str(uuid.uuid4()); JOBS[job_id]={'id':job_id,'url':url,'quality':quality,'media_type':media_type,'status':'queued','percent':0,'message':'در صف دانلود...','retry_count':0,'created_at':time.time()}; CANCEL_EVENTS[job_id]=threading.Event(); EXECUTOR.submit(run_download,job_id,url,quality,media_type); return jsonify(success=True,job_id=job_id)
 
 
 @app.get('/api/progress/<job_id>')
@@ -181,9 +230,12 @@ def api_retry(job_id):
 
 @app.get('/api/file/<job_id>')
 def api_file(job_id):
-    j=get_job(job_id); p=j.get('file_path')
-    if not p or not os.path.isfile(p):return jsonify(success=False,error='فایل پیدا نشد.'),404
-    return send_file(p,as_attachment=True,download_name=j.get('filename',os.path.basename(p)))
+    j=get_job(job_id); p=j.get('file_path'); filename=j.get('filename')
+    if not p and str(job_id).isdigit():
+        c=db(); row=c.execute('SELECT path,filename FROM history WHERE id=?',(int(job_id),)).fetchone(); c.close()
+        if row: p,filename=row['path'],row['filename']
+    if not p or not os.path.isfile(p): return jsonify(success=False,error='فایل پیدا نشد یا حذف شده است.'),404
+    return send_file(p,as_attachment=True,download_name=filename or os.path.basename(p))
 
 
 @app.post('/api/thumbnail')
@@ -192,7 +244,9 @@ def api_thumbnail():
     try:
         info=extract(url); thumb=info.get('thumbnail')
         if not thumb:raise RuntimeError('Thumbnail پیدا نشد')
-        import urllib.request; name=clean_title(info.get('title'))+'_thumbnail.jpg'; path=os.path.join(DOWNLOAD_FOLDER,name); urllib.request.urlretrieve(thumb,path); return send_file(path,as_attachment=True,download_name=name)
+        name=clean_title(info.get('title'))+'_thumbnail.jpg'; path=os.path.join(DOWNLOAD_FOLDER,name)
+        with urllib.request.urlopen(thumb,timeout=20) as response, open(path,'wb') as out: shutil.copyfileobj(response,out)
+        return send_file(path,as_attachment=True,download_name=name)
     except Exception as e:return jsonify(success=False,error=human_error(e)),500
 
 
@@ -217,7 +271,15 @@ def api_get_settings():return jsonify(success=True,settings=get_settings())
 
 @app.put('/api/settings')
 def api_put_settings():
-    d=request.get_json(silent=True) or {}; allowed={'download_path','theme','language','concurrent_downloads','speed_limit','notifications','clipboard_monitor'}; c=db()
+    d=request.get_json(silent=True) or {}
+    allowed={'download_path','theme','language','concurrent_downloads','speed_limit','notifications','clipboard_monitor'}
+    if 'concurrent_downloads' in d:
+        try: d['concurrent_downloads']=max(1,min(5,int(d['concurrent_downloads'])))
+        except (TypeError,ValueError): d.pop('concurrent_downloads',None)
+    if 'speed_limit' in d:
+        try: d['speed_limit']=max(0,int(d['speed_limit']))
+        except (TypeError,ValueError): d.pop('speed_limit',None)
+    c=db()
     for k,v in d.items():
         if k in allowed:
             if isinstance(v,bool):v='true' if v else 'false'
@@ -253,4 +315,4 @@ def frontend(path):
     return jsonify(success=True,message='Vue frontend is not built. Run: cd frontend && npm install && npm run build')
 
 init_db()
-if __name__=='__main__':app.run(host='127.0.0.1',port=5000,debug=True)
+if __name__=='__main__':app.run(host='0.0.0.0',port=int(os.environ.get('PORT','5000')),debug=False)
