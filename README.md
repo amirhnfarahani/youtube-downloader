@@ -7,14 +7,14 @@ A modern, responsive and self-hosted YouTube downloader with a **Vue.js frontend
 ### Download
 
 - 🎬 Download YouTube videos in the selected quality
--  Download audio as MP3
--  Support for YouTube videos, Shorts and Playlists
--  Paste YouTube links directly from the Clipboard
--  Download video thumbnails
--  Fetch video title, thumbnail, uploader and duration before downloading
--  Dynamic quality detection
--  Best-quality download option
--  Automatic video/audio merging through FFmpeg
+- 🎵 Download audio as MP3
+- 📺 Support for YouTube videos, Shorts and Playlists
+- 📋 Paste YouTube links directly from the Clipboard
+- 🖼️ Download video thumbnails
+- 🔎 Fetch video title, thumbnail, uploader and duration before downloading
+- 🎚️ Dynamic quality detection
+- ⭐ Best-quality download option
+- 🔀 Automatic video/audio merging through FFmpeg
 
 ### Playlist
 
@@ -126,7 +126,7 @@ FFmpeg is required when the selected format needs separate video/audio streams t
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/amirhosein126/youtube-downloader.git
+git clone https://github.com/amirhnfarahani/youtube-downloader.git
 cd youtube-downloader
 ```
 
@@ -321,4 +321,6 @@ See the repository license file for the project's current license information.
 
 Developed by **amirhnfarahani**.
 
-GitHub: https://github.com/amirhnfarahani/youtube-downloader
+GitHub: https://github.com/amirhnfarahani
+
+Repository: https://github.com/amirhnfarahani/youtube-downloader
