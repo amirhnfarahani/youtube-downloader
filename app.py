@@ -11,6 +11,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 import urllib.request
 import sys
+import webbrowser
 
 import yt_dlp
 
@@ -526,4 +527,6 @@ def frontend(path):
 init_db()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', '5000')), debug=False)
+    port = int(os.environ.get('PORT', '5000'))
+    threading.Timer(1.2, lambda: webbrowser.open(f'http://127.0.0.1:{port}')).start()
+    app.run(host='0.0.0.0', port=port, debug=False)
