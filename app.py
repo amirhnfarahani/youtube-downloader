@@ -11,7 +11,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 import urllib.request
 import sys
-import webbrowser
+import socket
 
 import yt_dlp
 
@@ -526,7 +526,44 @@ def frontend(path):
 
 init_db()
 
+def run_server(port):
+    app.run(host='127.0.0.1', port=port, debug=False, use_reloader=False)
+
+
+def wait_for_server(port, timeout=15):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            with socket.create_connection(('127.0.0.1', port), timeout=0.5):
+                return True
+        except OSError:
+            time.sleep(0.15)
+    return False
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', '5000'))
-    threading.Timer(1.2, lambda: webbrowser.open(f'http://127.0.0.1:{port}')).start()
-    app.run(host='0.0.0.0', port=port, debug=False)
+
+    try:
+        import webview
+    except ImportError:
+        print('pywebview is required for desktop mode.')
+        raise
+
+    server_thread = threading.Thread(target=run_server, args=(port,), daemon=True)
+    server_thread.start()
+
+    if not wait_for_server(port):
+        raise RuntimeError(f'Local server did not start on port {port}.')
+
+    window = webview.create_window(
+        'YouTube Downloader',
+        f'http://127.0.0.1:{port}',
+        width=1280,
+        height=820,
+        min_size=(980, 680),
+        resizable=True,
+        text_select=True
+    )
+
+    webview.start()
