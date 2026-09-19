@@ -14,6 +14,13 @@ export default defineConfig({
         target: 'http://127.0.0.1:5000',
         changeOrigin: true,
       },
+
+      // Fonts are served by Flask from /font/*
+      // This makes the local Vite dev server load the same fonts as production.
+      '/font': {
+        target: 'http://127.0.0.1:5000',
+        changeOrigin: true,
+      },
     },
   },
 
