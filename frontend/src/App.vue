@@ -88,7 +88,36 @@ async function deleteHistory(id){ await api('/history/'+id,{method:'DELETE'}); a
 async function saveSettings(){ await api('/settings',{method:'PUT',body:JSON.stringify(settings.value)}) }
 async function savePreset(){ const name=prompt('نام Preset را وارد کنید'); if(!name)return; await api('/presets',{method:'POST',body:JSON.stringify({name,settings:{quality:selectedQuality.value,mediaType:mediaType.value}})}); await loadPresets() }
 async function usePreset(p){ selectedQuality.value=p.settings.quality||'best'; mediaType.value=p.settings.mediaType||'video' }
-async function checkClipboard(){ try{const text=await navigator.clipboard.readText(); if(/youtube\.com|youtu\.be/i.test(text)){url.value=text; await inspect()}}catch{} }
+async function pasteFromClipboard(){
+  error.value = ''
+  try {
+    if (!navigator.clipboard || !window.isSecureContext) {
+      throw new Error('دسترسی مستقیم به Clipboard در این آدرس فعال نیست. داخل کادر کلیک کنید و Ctrl+V بزنید.')
+    }
+    const text = (await navigator.clipboard.readText()).trim()
+    if (!text) {
+      error.value = 'Clipboard خالی است.'
+      return
+    }
+    url.value = text
+    if (/youtube\.com|youtu\.be/i.test(text)) {
+      await inspect()
+    } else {
+      error.value = 'متن Clipboard یک لینک YouTube معتبر نیست.'
+    }
+  } catch (e) {
+    error.value = e?.message || 'دسترسی به Clipboard توسط مرورگر مسدود شده است. داخل کادر کلیک کنید و Ctrl+V بزنید.'
+  }
+}
+
+async function handlePaste(event){
+  const text = event.clipboardData?.getData('text')?.trim() || ''
+  if (!text) return
+  url.value = text
+  if (/youtube\.com|youtu\.be/i.test(text)) {
+    await inspect()
+  }
+}
 function toggleTheme(){isDark.value=!isDark.value; document.documentElement.dataset.theme=isDark.value?'dark':'light'; settings.value.theme=isDark.value?'dark':'light'; saveSettings()}
 
 onMounted(async()=>{ try{const s=await api('/settings');settings.value={...settings.value,...s.settings};isDark.value=settings.value.theme!=='light';document.documentElement.dataset.theme=isDark.value?'dark':'light';await loadHistory();await loadPresets();startPolling()}catch(e){error.value=e.message} })
@@ -110,13 +139,13 @@ onUnmounted(()=>clearTimeout(timer))
   </aside>
 
   <main class="content">
-    <header class="topbar"><div><span class="eyebrow">VIDEO DOWNLOADER</span><h1>{{active==='download'?'دانلود سریع و حرفه‌ای':active==='queue'?'صف دانلود':active==='history'?'تاریخچه دانلود':'مدیریت برنامه'}}</h1></div><button class="icon-btn" @click="checkClipboard" title="خواندن Clipboard"><Clipboard/></button></header>
+    <header class="topbar"><div><span class="eyebrow">VIDEO DOWNLOADER</span><h1>{{active==='download'?'دانلود سریع و حرفه‌ای':active==='queue'?'صف دانلود':active==='history'?'تاریخچه دانلود':'مدیریت برنامه'}}</h1></div><button class="icon-btn" @click="pasteFromClipboard" title="خواندن Clipboard"><Clipboard/></button></header>
 
     <section v-if="active==='download'" class="download-page">
       <div class="hero-card">
         <div class="hero-icon"><Download/></div><h2>لینک YouTube را وارد کنید</h2><p>ویدیو، Playlist و Shorts را با کیفیت دلخواه دانلود کنید.</p>
-        <div class="url-row"><input v-model="url" @keyup.enter="inspect" placeholder="https://www.youtube.com/watch?v=..."/><button class="primary" :disabled="loading" @click="inspect">{{loading?'در حال بررسی...':'بررسی لینک'}} <Search/></button></div>
-        <div class="quick"><button @click="checkClipboard"><Clipboard/> Paste از Clipboard</button><button @click="mediaType='audio'"><Music2/> MP3</button><button @click="mediaType='video'"><Video/> Video</button></div>
+        <div class="url-row"><input v-model="url" @paste="handlePaste" @keyup.enter="inspect" placeholder="https://www.youtube.com/watch?v=..."/><button class="primary" :disabled="loading" @click="inspect">{{loading?'در حال بررسی...':'بررسی لینک'}} <Search/></button></div>
+        <div class="quick"><button @click="pasteFromClipboard"><Clipboard/> Paste از Clipboard</button><button @click="mediaType='audio'"><Music2/> MP3</button><button @click="mediaType='video'"><Video/> Video</button></div>
       </div>
 
       <div v-if="error" class="alert error"><AlertCircle/> {{error}} <button @click="error=''">×</button></div>
