@@ -1,9 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
 from pathlib import Path
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
 ROOT = Path(SPECPATH).resolve().parent.parent
-hiddenimports = collect_submodules("yt_dlp")
+hiddenimports = collect_submodules("yt_dlp") + collect_submodules("webview")
+webview_datas = collect_data_files("webview")
 
 a = Analysis(
     [str(ROOT / "app.py")],
@@ -15,7 +16,7 @@ a = Analysis(
     datas=[
         (str(ROOT / "frontend/dist"), "frontend/dist"),
         (str(ROOT / "static"), "static"),
-    ],
+    ] + webview_datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
