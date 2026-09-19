@@ -14,24 +14,22 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          node-version: "22"
 
       - name: Build Vue frontend
         working-directory: frontend
         run: |
-          npm ci
+          npm install
           npm run build
 
       - name: Install Python dependencies
@@ -47,6 +45,7 @@ jobs:
           Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile "$env:RUNNER_TEMP\ffmpeg.zip"
           Expand-Archive -Path "$env:RUNNER_TEMP\ffmpeg.zip" -DestinationPath "$env:RUNNER_TEMP\ffmpeg" -Force
           $exe = Get-ChildItem "$env:RUNNER_TEMP\ffmpeg" -Recurse -Filter ffmpeg.exe | Select-Object -First 1
+          if (-not $exe) { throw "ffmpeg.exe was not found in the downloaded archive." }
           Copy-Item $exe.FullName "build/windows/ffmpeg.exe"
 
       - name: Download Node.js runtime
@@ -55,6 +54,7 @@ jobs:
           Invoke-WebRequest -Uri "https://nodejs.org/dist/v20.19.5/node-v20.19.5-win-x64.zip" -OutFile "$env:RUNNER_TEMP\node.zip"
           Expand-Archive -Path "$env:RUNNER_TEMP\node.zip" -DestinationPath "$env:RUNNER_TEMP\node" -Force
           $node = Get-ChildItem "$env:RUNNER_TEMP\node" -Recurse -Filter node.exe | Select-Object -First 1
+          if (-not $node) { throw "node.exe was not found in the downloaded archive." }
           Copy-Item $node.FullName "build/windows/node.exe"
 
       - name: Build portable EXE
