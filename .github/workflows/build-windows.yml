@@ -5,8 +5,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - "v*"
 
 jobs:
   build:
@@ -105,9 +103,10 @@ jobs:
           }
 
       - name: Create GitHub Release
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v1.0.0
           files: |
             release/YouTubeDownloader.exe
             release/YouTubeDownloader-Portable.zip
