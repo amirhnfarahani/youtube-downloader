@@ -2,13 +2,16 @@
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_submodules
 
-ROOT = Path(SPECPATH).resolve().parents[2]
+ROOT = Path(SPECPATH).resolve().parent.parent
 hiddenimports = collect_submodules("yt_dlp")
 
 a = Analysis(
     [str(ROOT / "app.py")],
     pathex=[str(ROOT)],
-    binaries=[(str(ROOT / "build/windows/ffmpeg.exe"), ".")],
+    binaries=[
+        (str(ROOT / "build/windows/ffmpeg.exe"), "."),
+        (str(ROOT / "build/windows/node.exe"), "."),
+    ],
     datas=[
         (str(ROOT / "frontend/dist"), "frontend/dist"),
         (str(ROOT / "static"), "static"),
