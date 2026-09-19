@@ -26,6 +26,7 @@ FRONTEND_DIST = os.path.join(RESOURCE_DIR, 'frontend', 'dist')
 STATIC_FOLDER = os.path.join(RESOURCE_DIR, 'static')
 DB_PATH = os.path.join(BASE_DIR, 'downloader.db')
 BUNDLED_FFMPEG = os.path.join(RESOURCE_DIR, 'ffmpeg.exe')
+BUNDLED_NODE = os.path.join(RESOURCE_DIR, 'node.exe')
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 app = Flask(__name__, static_folder=None)
@@ -103,8 +104,8 @@ def ffmpeg_options():
     return {}
 
 def node_runtime_options():
-    # yt-dlp expects each JS runtime config to be a dict.
-    # Node.js is resolved from PATH, so no executable path is required here.
+    if os.path.isfile(BUNDLED_NODE):
+        return {'js_runtimes': {'node': {'path': BUNDLED_NODE}}}
     if shutil.which('node'):
         return {'js_runtimes': {'node': {}}}
     return {}
