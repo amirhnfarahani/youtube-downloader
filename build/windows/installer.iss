@@ -19,7 +19,7 @@ PrivilegesRequired=lowest
 UninstallDisplayName={#MyAppName}
 
 [Files]
-Source: "dist\YouTubeDownloader.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\dist\YouTubeDownloader.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]
 Name: "{app}\downloads"
