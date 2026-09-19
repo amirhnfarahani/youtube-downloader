@@ -10,14 +10,22 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 import urllib.request
+import sys
 
 import yt_dlp
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, 'frozen', False):
+    BASE_DIR = os.path.dirname(sys.executable)
+    RESOURCE_DIR = getattr(sys, '_MEIPASS', BASE_DIR)
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    RESOURCE_DIR = BASE_DIR
+
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, 'downloads')
-FRONTEND_DIST = os.path.join(BASE_DIR, 'frontend', 'dist')
-STATIC_FOLDER = os.path.join(BASE_DIR, 'static')
+FRONTEND_DIST = os.path.join(RESOURCE_DIR, 'frontend', 'dist')
+STATIC_FOLDER = os.path.join(RESOURCE_DIR, 'static')
 DB_PATH = os.path.join(BASE_DIR, 'downloader.db')
+BUNDLED_FFMPEG = os.path.join(RESOURCE_DIR, 'ffmpeg.exe')
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 app = Flask(__name__, static_folder=None)
@@ -89,6 +97,11 @@ def human_error(error):
     return re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', text) or 'دانلود با خطای ناشناخته مواجه شد.'
 
 
+def ffmpeg_options():
+    if os.path.isfile(BUNDLED_FFMPEG):
+        return {'ffmpeg_location': os.path.dirname(BUNDLED_FFMPEG)}
+    return {}
+
 def node_runtime_options():
     # yt-dlp expects each JS runtime config to be a dict.
     # Node.js is resolved from PATH, so no executable path is required here.
@@ -106,6 +119,7 @@ def info_options():
         'extractor_retries': 3,
         'socket_timeout': 20
     }
+    opts.update(ffmpeg_options())
     opts.update(node_runtime_options())
     return opts
 
@@ -136,7 +150,8 @@ def get_settings():
 
 @app.get('/api/health')
 def health():
-    return jsonify(success=True, yt_dlp=getattr(yt_dlp, 'version', 'unknown'), ffmpeg=bool(shutil.which('ffmpeg')), node=bool(shutil.which('node')), disk_free=shutil.disk_usage(BASE_DIR).free)
+    ffmpeg_ok = os.path.isfile(BUNDLED_FFMPEG) or bool(shutil.which('ffmpeg'))
+    return jsonify(success=True, yt_dlp=getattr(yt_dlp, 'version', 'unknown'), ffmpeg=ffmpeg_ok, node=bool(shutil.which('node')), disk_free=shutil.disk_usage(BASE_DIR).free)
 
 
 @app.post('/api/info')
@@ -199,6 +214,7 @@ def download_options(job_id, url, quality, media_type):
             set_job(job_id, status='processing', percent=99, message='در حال پردازش فایل...', connection_state='processing')
 
     opts = {'format': fmt, 'outtmpl': outtmpl, 'merge_output_format': 'mp4', 'noplaylist': True, 'quiet': True, 'no_warnings': True, 'progress_hooks': [hook], 'retries': MAX_RETRIES, 'fragment_retries': MAX_RETRIES, 'extractor_retries': 3, 'file_access_retries': 3, 'socket_timeout': 20, 'continuedl': True}
+    opts.update(ffmpeg_options())
     opts.update(node_runtime_options())
 
     if s['speed_limit']:
