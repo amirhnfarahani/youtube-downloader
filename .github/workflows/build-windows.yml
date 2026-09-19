@@ -47,6 +47,14 @@ jobs:
           $exe = Get-ChildItem "$env:RUNNER_TEMP\ffmpeg" -Recurse -Filter ffmpeg.exe | Select-Object -First 1
           Copy-Item $exe.FullName "build/windows/ffmpeg.exe"
 
+      - name: Download Node.js runtime
+        shell: powershell
+        run: |
+          Invoke-WebRequest -Uri "https://nodejs.org/dist/v20.19.5/node-v20.19.5-win-x64.zip" -OutFile "$env:RUNNER_TEMP\node.zip"
+          Expand-Archive -Path "$env:RUNNER_TEMP\node.zip" -DestinationPath "$env:RUNNER_TEMP\node" -Force
+          $node = Get-ChildItem "$env:RUNNER_TEMP\node" -Recurse -Filter node.exe | Select-Object -First 1
+          Copy-Item $node.FullName "build/windows/node.exe"
+
       - name: Build portable EXE
         run: |
           pyinstaller --clean --noconfirm build/windows/YouTubeDownloader.spec
