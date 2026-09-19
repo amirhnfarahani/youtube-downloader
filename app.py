@@ -90,9 +90,11 @@ def human_error(error):
 
 
 def node_runtime_options():
-    # Keep Node.js optional so deployment can still run on machines without Node.
-    node = shutil.which('node')
-    return {'js_runtimes': {'node': node}} if node else {}
+    # yt-dlp expects each JS runtime config to be a dict.
+    # Node.js is resolved from PATH, so no executable path is required here.
+    if shutil.which('node'):
+        return {'js_runtimes': {'node': {}}}
+    return {}
 
 
 def info_options():
