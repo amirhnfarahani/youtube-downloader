@@ -90,7 +90,9 @@ def human_error(error):
     low = text.lower()
     if any(x in low for x in ('failed to resolve', 'getaddrinfo failed', 'name or service not known', 'dns')):
         return 'اتصال DNS برقرار نشد. اینترنت، DNS یا VPN/Proxy را بررسی کنید.'
-    if any(x in low for x in ('timed out', 'timeout', 'connection reset', 'connection aborted', 'network is unreachable')):
+    if '10054' in low or 'connection forcibly closed' in low or 'connection reset' in low:
+        return 'ارتباط YouTube توسط سرور یا مسیر شبکه قطع شد. برنامه روش‌های اتصال جایگزین را خودکار امتحان می‌کند.'
+    if any(x in low for x in ('timed out', 'timeout', 'connection aborted', 'network is unreachable')):
         return 'ارتباط با سرور ناپایدار شد. برنامه تلاش مجدد خودکار انجام می‌دهد.'
     if 'ffmpeg' in low and ('not found' in low or 'not installed' in low):
         return 'FFmpeg نصب نیست و برای تبدیل یا ادغام صدا و تصویر لازم است.'
@@ -112,25 +114,65 @@ def node_runtime_options():
     return {}
 
 
-def info_options():
+def network_profiles():
+    # Try the normal transport first. If YouTube resets the connection,
+    # retry with browser impersonation and finally with IPv4.
+    return [
+        {},
+        {'impersonate': 'chrome'},
+        {'impersonate': 'chrome', 'source_address': '0.0.0.0'},
+    ]
+
+
+def info_options(profile=None):
     opts = {
         'quiet': True,
         'no_warnings': True,
         'skip_download': True,
         'retries': MAX_RETRIES,
-        'extractor_retries': 3,
-        'socket_timeout': 20
+        'extractor_retries': 5,
+        'socket_timeout': 30,
+        'fragment_retries': MAX_RETRIES,
+        'file_access_retries': 5,
     }
+    if profile:
+        opts.update(profile)
     opts.update(ffmpeg_options())
     opts.update(node_runtime_options())
     return opts
 
 
+def is_network_error(error):
+    text = str(error or '').lower()
+    return any(token in text for token in (
+        'winerror 10054',
+        'connection reset',
+        'connection forcibly closed',
+        'connection aborted',
+        'transporterror',
+        'timed out',
+        'timeout',
+        'network is unreachable',
+        'temporary failure in name resolution',
+        'failed to resolve',
+    ))
+
+
 def extract(url, playlist=False):
-    opts = info_options()
-    opts['noplaylist'] = not playlist
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        return ydl.extract_info(url, download=False)
+    profiles = network_profiles()
+    last_error = None
+    for profile_index, profile in enumerate(profiles, 1):
+        opts = info_options(profile)
+        opts['noplaylist'] = not playlist
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                return ydl.extract_info(url, download=False)
+        except Exception as error:
+            last_error = error
+            if not is_network_error(error) or profile_index == len(profiles):
+                raise
+            time.sleep(0.8)
+    raise last_error
 
 
 def clean_title(title):
@@ -187,7 +229,7 @@ def api_playlist():
         return jsonify(success=False, error=human_error(e)), 500
 
 
-def download_options(job_id, url, quality, media_type):
+def download_options(job_id, url, quality, media_type, profile=None):
     s = get_settings()
     folder = s['download_path'] or DOWNLOAD_FOLDER
     os.makedirs(folder, exist_ok=True)
@@ -215,7 +257,23 @@ def download_options(job_id, url, quality, media_type):
         elif d.get('status') == 'finished':
             set_job(job_id, status='processing', percent=99, message='در حال پردازش فایل...', connection_state='processing')
 
-    opts = {'format': fmt, 'outtmpl': outtmpl, 'merge_output_format': 'mp4', 'noplaylist': True, 'quiet': True, 'no_warnings': True, 'progress_hooks': [hook], 'retries': MAX_RETRIES, 'fragment_retries': MAX_RETRIES, 'extractor_retries': 3, 'file_access_retries': 3, 'socket_timeout': 20, 'continuedl': True}
+    opts = {
+        'format': fmt,
+        'outtmpl': outtmpl,
+        'merge_output_format': 'mp4',
+        'noplaylist': True,
+        'quiet': True,
+        'no_warnings': True,
+        'progress_hooks': [hook],
+        'retries': MAX_RETRIES,
+        'fragment_retries': MAX_RETRIES,
+        'extractor_retries': 5,
+        'file_access_retries': 5,
+        'socket_timeout': 30,
+        'continuedl': True,
+    }
+    if profile:
+        opts.update(profile)
     opts.update(ffmpeg_options())
     opts.update(node_runtime_options())
 
@@ -271,11 +329,48 @@ def run_download(job_id, url, quality, media_type='video'):
                 return
             slot_acquired = True
             set_job(job_id, status='starting', retry_count=attempt - 1, message='در حال اتصال به YouTube...', connection_state='connecting')
-            info = extract(url)
-            title = info.get('title') or 'video'
-            opts, folder = download_options(job_id, url, quality, media_type)
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                ydl.extract_info(url, download=True)
+            folder = get_settings()['download_path'] or DOWNLOAD_FOLDER
+            title = None
+            last_profile_error = None
+            profiles = network_profiles()
+
+            for profile_index, profile in enumerate(profiles, 1):
+                if event.is_set():
+                    raise RuntimeError('DOWNLOAD_CANCELLED')
+                try:
+                    set_job(
+                        job_id,
+                        message='در حال اتصال به YouTube...' if profile_index == 1 else f'تلاش با روش اتصال جایگزین {profile_index}...',
+                        connection_state='connecting',
+                    )
+                    info_opts = info_options(profile)
+                    info_opts['noplaylist'] = True
+                    with yt_dlp.YoutubeDL(info_opts) as info_ydl:
+                        info = info_ydl.extract_info(url, download=False)
+                    title = info.get('title') or 'video'
+
+                    opts, folder = download_options(job_id, url, quality, media_type, profile)
+                    with yt_dlp.YoutubeDL(opts) as ydl:
+                        ydl.extract_info(url, download=True)
+                    last_profile_error = None
+                    break
+                except Exception as profile_error:
+                    last_profile_error = profile_error
+                    if not is_network_error(profile_error) or profile_index == len(profiles):
+                        raise
+                    cleanup_job_files(folder, job_id)
+                    set_job(
+                        job_id,
+                        status='retrying',
+                        message=f'ارتباط با YouTube قطع شد؛ روش اتصال {profile_index + 1} در حال امتحان است...',
+                        error=human_error(profile_error),
+                        retrying=True,
+                        connection_state='retrying',
+                    )
+                    time.sleep(1)
+
+            if last_profile_error is not None:
+                raise last_profile_error
 
             files = [f for f in glob.glob(os.path.join(folder, job_id + '.*')) if not f.endswith('.part')]
             if not files:
