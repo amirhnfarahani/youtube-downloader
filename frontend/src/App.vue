@@ -91,12 +91,15 @@ async function usePreset(p){ selectedQuality.value=p.settings.quality||'best'; m
 async function pasteFromClipboard(){
   error.value = ''
   try {
-    if (!navigator.clipboard || !window.isSecureContext) {
-      throw new Error('دسترسی مستقیم به Clipboard در این آدرس فعال نیست. داخل کادر کلیک کنید و Ctrl+V بزنید.')
+    let text = ''
+    if (navigator.clipboard && window.isSecureContext) {
+      try { text = (await navigator.clipboard.readText()).trim() } catch {}
     }
-    const text = (await navigator.clipboard.readText()).trim()
     if (!text) {
-      error.value = 'Clipboard خالی است.'
+      try { text = String((await api('/clipboard')).text || '').trim() } catch {}
+    }
+    if (!text) {
+      error.value = 'Clipboard خالی است یا دسترسی به آن امکان‌پذیر نیست.'
       return
     }
     url.value = text
@@ -106,7 +109,7 @@ async function pasteFromClipboard(){
       error.value = 'متن Clipboard یک لینک YouTube معتبر نیست.'
     }
   } catch (e) {
-    error.value = e?.message || 'دسترسی به Clipboard توسط مرورگر مسدود شده است. داخل کادر کلیک کنید و Ctrl+V بزنید.'
+    error.value = e?.message || 'دسترسی به Clipboard امکان‌پذیر نیست.'
   }
 }
 
