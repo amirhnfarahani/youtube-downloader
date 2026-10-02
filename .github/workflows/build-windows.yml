@@ -25,18 +25,21 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Build Vue frontend
         working-directory: frontend
         run: |
           npm install
           npm run build
+          if (-not (Test-Path "dist/index.html")) { throw "Vue build did not produce dist/index.html" }
 
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller
 
       - name: Download FFmpeg
         shell: powershell
@@ -47,6 +50,7 @@ jobs:
           $exe = Get-ChildItem "$env:RUNNER_TEMP\ffmpeg" -Recurse -Filter ffmpeg.exe | Select-Object -First 1
           if (-not $exe) { throw "ffmpeg.exe was not found in the downloaded archive." }
           Copy-Item $exe.FullName "build/windows/ffmpeg.exe"
+          if (-not (Test-Path "build/windows/ffmpeg.exe")) { throw "FFmpeg bundle is missing." }
 
       - name: Download Node.js runtime
         shell: powershell
@@ -56,12 +60,21 @@ jobs:
           $node = Get-ChildItem "$env:RUNNER_TEMP\node" -Recurse -Filter node.exe | Select-Object -First 1
           if (-not $node) { throw "node.exe was not found in the downloaded archive." }
           Copy-Item $node.FullName "build/windows/node.exe"
+          if (-not (Test-Path "build/windows/node.exe")) { throw "Node runtime is missing." }
 
       - name: Build portable EXE
+        shell: powershell
         run: |
-          pyinstaller --clean --noconfirm build/windows/YouTubeDownloader.spec
+          python -m PyInstaller --clean --noconfirm build/windows/YouTubeDownloader.spec
+          if (-not (Test-Path "dist\YouTubeDownloader.exe")) { throw "PyInstaller did not produce YouTubeDownloader.exe" }
           New-Item -ItemType Directory -Force release | Out-Null
           Copy-Item dist\YouTubeDownloader.exe release\YouTubeDownloader.exe
+
+      - name: Verify packaged resources
+        shell: powershell
+        run: |
+          if ((Get-Item "release\YouTubeDownloader.exe").Length -lt 1000000) { throw "The generated EXE is unexpectedly small." }
+          if (-not (Test-Path "frontend\dist\index.html")) { throw "Frontend resource is missing." }
 
       - name: Install Inno Setup
         shell: powershell
@@ -71,6 +84,7 @@ jobs:
         shell: powershell
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "build\windows\installer.iss"
+          if (-not (Test-Path "build\windows\dist\YouTubeDownloader-Setup.exe")) { throw "Inno Setup did not produce the installer." }
           Copy-Item build\windows\dist\YouTubeDownloader-Setup.exe release\YouTubeDownloader-Setup.exe
 
       - name: Create portable ZIP
