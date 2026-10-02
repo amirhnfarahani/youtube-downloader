@@ -8,7 +8,7 @@ AppId={{8D5B8C8E-8D9A-4E3A-BE45-8C9E6A9F2D11}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={autopf}\YouTube Downloader
+DefaultDirName={localappdata}\Programs\YouTube Downloader
 DefaultGroupName={#MyAppName}
 OutputDir=dist
 OutputBaseFilename=YouTubeDownloader-Setup
@@ -26,7 +26,7 @@ Name: "{app}\downloads"
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{MyAppExeName}"
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "اجرای YouTube Downloader"; Flags: nowait postinstall skipifsilent
