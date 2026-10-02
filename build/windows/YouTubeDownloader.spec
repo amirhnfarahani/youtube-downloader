@@ -1,10 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
 from pathlib import Path
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 ROOT = Path(SPECPATH).resolve().parent.parent
-hiddenimports = collect_submodules("yt_dlp") + collect_submodules("webview")
-webview_datas = collect_data_files("webview")
+
+webview_datas, webview_binaries, webview_hiddenimports = collect_all("webview")
+yt_dlp_hiddenimports = collect_submodules("yt_dlp")
 
 a = Analysis(
     [str(ROOT / "app.py")],
@@ -12,12 +13,12 @@ a = Analysis(
     binaries=[
         (str(ROOT / "build/windows/ffmpeg.exe"), "."),
         (str(ROOT / "build/windows/node.exe"), "."),
-    ],
+    ] + webview_binaries,
     datas=[
         (str(ROOT / "frontend/dist"), "frontend/dist"),
         (str(ROOT / "static"), "static"),
     ] + webview_datas,
-    hiddenimports=hiddenimports,
+    hiddenimports=yt_dlp_hiddenimports + webview_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
