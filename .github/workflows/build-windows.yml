@@ -1,5 +1,7 @@
 name: Build Windows
 
+# Dependency caching is intentionally disabled for reliable Windows builds.
+
 on:
   workflow_dispatch:
   push:
