@@ -14,6 +14,7 @@ import sys
 import socket
 
 import yt_dlp
+import pyperclip
 
 if getattr(sys, 'frozen', False):
     BASE_DIR = os.path.dirname(sys.executable)
@@ -190,6 +191,15 @@ def get_settings():
     r['notifications'] = r.get('notifications') == 'true'
     r['clipboard_monitor'] = r.get('clipboard_monitor') == 'true'
     return r
+
+
+@app.get('/api/clipboard')
+def api_clipboard():
+    try:
+        value = pyperclip.paste() or ''
+        return jsonify(success=True, text=value)
+    except Exception:
+        return jsonify(success=False, error='دسترسی به Clipboard سیستم ممکن نیست.'), 500
 
 
 @app.get('/api/health')
