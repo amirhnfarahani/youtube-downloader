@@ -15,6 +15,7 @@ OutputBaseFilename=YouTubeDownloader-Setup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=..\..\build\windows\youtube-purple.ico
 PrivilegesRequired=lowest
 UninstallDisplayName={#MyAppName}
 
