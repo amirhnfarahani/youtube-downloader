@@ -70,12 +70,14 @@ async function downloadThumbnail() {
 }
 
 async function poll() {
-  if (!runningJobs.value.length) return
+  if (!jobs.value.length) return
   jobs.value = await Promise.all(jobs.value.map(async j => {
     if (['completed','error','cancelled'].includes(j.status)) return j
     try { return (await api('/progress/'+j.id)) }
     catch { return j }
   }))
+  const failed = jobs.value.find(j => j.status === 'error')
+  if (failed?.error) error.value = failed.error
   if (runningJobs.value.length) timer=setTimeout(poll,800)
 }
 function startPolling(){clearTimeout(timer); poll()}
@@ -100,11 +102,33 @@ async function deleteFile(id){
 }
 async function loadHistory(){ history.value=(await api('/history')).items }
 async function loadPresets(){ presets.value=(await api('/presets')).items }
+async function deletePreset(id){
+  try { await api('/presets/'+id,{method:'DELETE'}); await loadPresets() }
+  catch(e) { error.value=e.message }
+}
 async function clearHistory(){ await api('/history',{method:'DELETE'}); await loadHistory() }
 async function deleteHistory(id){ await api('/history/'+id,{method:'DELETE'}); await loadHistory() }
 async function saveSettings(){ await api('/settings',{method:'PUT',body:JSON.stringify(settings.value)}) }
-async function savePreset(){ const name=prompt('نام Preset را وارد کنید'); if(!name)return; await api('/presets',{method:'POST',body:JSON.stringify({name,settings:{quality:selectedQuality.value,mediaType:mediaType.value}})}); await loadPresets() }
-async function usePreset(p){ selectedQuality.value=p.settings.quality||'best'; mediaType.value=p.settings.mediaType||'video' }
+async function savePreset(){
+  const name=prompt('نام Preset را وارد کنید')
+  if(!name) return
+  try {
+    await api('/presets',{method:'POST',body:JSON.stringify({
+      name,
+      settings:{
+        quality:selectedQuality.value,
+        mediaType:mediaType.value
+      }
+    })})
+    await loadPresets()
+  } catch(e) { error.value=e.message }
+}
+async function usePreset(p){
+  selectedQuality.value=p.settings?.quality || 'best'
+  mediaType.value=p.settings?.mediaType || 'video'
+  active.value='download'
+  error.value=''
+}
 async function pasteFromClipboard(){
   error.value = ''
   try {
@@ -197,7 +221,7 @@ onUnmounted(()=>clearTimeout(timer))
 <button v-if="item.path" @click="moveFile(item.id)" title="انتقال فایل"><ArrowRightLeft/></button>
 <button v-if="item.path" class="danger" @click="deleteFile(item.id)" title="حذف کامل فایل"><Trash2/></button></div></section>
 
-    <section v-else-if="active==='presets'" class="panel"><div class="section-title"><div><h2>Download Presets</h2><p>تنظیمات آماده برای دانلود سریع</p></div><button class="primary" @click="savePreset"><Plus/> ساخت Preset</button></div><div class="preset-grid"><div v-for="p in presets" :key="p.id" class="preset"><Zap/><h3>{{p.name}}</h3><p>{{p.settings.mediaType||'video'}} · {{p.settings.quality||'best'}}</p><button @click="usePreset(p)">استفاده</button></div></div></section>
+    <section v-else-if="active==='presets'" class="panel"><div class="section-title"><div><h2>Download Presets</h2><p>تنظیمات آماده برای دانلود سریع</p></div><button class="primary" @click="savePreset"><Plus/> ساخت Preset</button></div><div class="preset-grid"><div v-for="p in presets" :key="p.id" class="preset"><Zap/><h3>{{p.name}}</h3><p>{{p.settings?.mediaType||'video'}} · {{p.settings?.quality||'best'}}</p><div class="preset-actions"><button @click="usePreset(p)">استفاده</button><button class="danger" @click="deletePreset(p.id)">حذف</button></div></div></div></section>
 
     <section v-else class="panel settings"><h2>تنظیمات</h2><label>مسیر دانلود<input v-model="settings.download_path"/></label><label>تعداد دانلود همزمان<input type="number" min="1" max="5" v-model.number="settings.concurrent_downloads"/></label><label>محدودیت سرعت (KB/s، صفر = بدون محدودیت)<input type="number" min="0" v-model.number="settings.speed_limit"/></label><label class="switch"><input type="checkbox" v-model="settings.notifications"/> اعلان پایان دانلود</label><label class="switch"><input type="checkbox" v-model="settings.clipboard_monitor"/> مانیتور Clipboard</label><button class="primary" @click="saveSettings">ذخیره تنظیمات</button></section>
   </main>
