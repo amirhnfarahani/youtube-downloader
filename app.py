@@ -482,28 +482,6 @@ def api_retry(job_id):
     return jsonify(success=True, job_id=new)
 
 
-@app.post('/api/open/<job_id>')
-def api_open(job_id):
-    j = get_job(job_id)
-    p = j.get('file_path')
-    if not p and str(job_id).isdigit():
-        c = db()
-        row = c.execute('SELECT path FROM history WHERE id=?', (int(job_id),)).fetchone()
-        c.close()
-        if row:
-            p = row['path']
-    if not p or not os.path.isfile(p):
-        return jsonify(success=False, error='فایل پیدا نشد یا حذف شده است.'), 404
-    try:
-        if os.name == 'nt':
-            os.startfile(os.path.normpath(p))
-        else:
-            import subprocess
-            subprocess.Popen(['xdg-open', p])
-        return jsonify(success=True)
-    except Exception as e:
-        return jsonify(success=False, error=f'باز کردن فایل ممکن نیست: {e}'), 500
-
 
 @app.get('/api/file/<job_id>')
 def api_file(job_id):
@@ -536,6 +514,108 @@ def api_thumbnail():
         return send_file(path, as_attachment=True, download_name=name)
     except Exception as e:
         return jsonify(success=False, error=human_error(e)), 500
+
+
+def resolve_file_record(item_id):
+    job = get_job(str(item_id))
+    if job.get('file_path'):
+        return job.get('file_path'), None
+    if str(item_id).isdigit():
+        c = db()
+        row = c.execute('SELECT id,path FROM history WHERE id=?', (int(item_id),)).fetchone()
+        c.close()
+        if row:
+            return row['path'], int(row['id'])
+    return None, None
+
+
+def open_folder_dialog():
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+        selected = filedialog.askdirectory(title='انتخاب پوشه مقصد')
+        root.destroy()
+        return selected or None
+    except Exception:
+        return None
+
+
+@app.post('/api/reveal/<job_id>')
+def api_reveal(job_id):
+    path, _ = resolve_file_record(job_id)
+    if not path or not os.path.isfile(path):
+        return jsonify(success=False, error='فایل پیدا نشد یا حذف شده است.'), 404
+    try:
+        if os.name == 'nt':
+            import subprocess
+            subprocess.Popen(['explorer.exe', '/select,', os.path.normpath(path)])
+        else:
+            import subprocess
+            subprocess.Popen(['xdg-open', os.path.dirname(path)])
+        return jsonify(success=True, path=path)
+    except Exception as e:
+        return jsonify(success=False, error=f'نمایش مسیر فایل ممکن نیست: {e}'), 500
+
+
+@app.post('/api/move/<job_id>')
+def api_move(job_id):
+    path, history_id = resolve_file_record(job_id)
+    if not path or not os.path.isfile(path):
+        return jsonify(success=False, error='فایل پیدا نشد یا حذف شده است.'), 404
+    destination_dir = str((request.get_json(silent=True) or {}).get('destination', '')).strip()
+    if not destination_dir:
+        destination_dir = open_folder_dialog()
+    if not destination_dir:
+        return jsonify(success=False, cancelled=True, error='انتقال فایل لغو شد.'), 400
+    if not os.path.isdir(destination_dir):
+        return jsonify(success=False, error='پوشه مقصد معتبر نیست.'), 400
+    try:
+        destination_dir = os.path.abspath(destination_dir)
+        source_abs = os.path.abspath(path)
+        if os.path.dirname(source_abs).lower() == destination_dir.lower():
+            return jsonify(success=False, error='فایل همین حالا در این پوشه قرار دارد.'), 400
+        filename = os.path.basename(source_abs)
+        destination = os.path.join(destination_dir, filename)
+        if os.path.exists(destination):
+            base, ext = os.path.splitext(filename)
+            counter = 1
+            while os.path.exists(destination):
+                destination = os.path.join(destination_dir, f'{base}_{counter}{ext}')
+                counter += 1
+        shutil.move(source_abs, destination)
+        c = db()
+        c.execute('UPDATE history SET path=?, filename=?, status=? WHERE path=?', (destination, os.path.basename(destination), 'completed', source_abs))
+        c.commit()
+        c.close()
+        set_job(str(job_id), file_path=destination, filename=os.path.basename(destination), status='completed')
+        return jsonify(success=True, path=destination, filename=os.path.basename(destination))
+    except Exception as e:
+        return jsonify(success=False, error=f'انتقال فایل انجام نشد: {e}'), 500
+
+
+@app.delete('/api/file/<job_id>')
+def api_delete_file(job_id):
+    path, history_id = resolve_file_record(job_id)
+    if not path:
+        return jsonify(success=False, error='فایل پیدا نشد.'), 404
+    try:
+        if os.path.isfile(path):
+            os.remove(path)
+        c = db()
+        c.execute('DELETE FROM history WHERE path=?', (path,))
+        c.commit()
+        c.close()
+        with JOBS_LOCK:
+            if str(job_id) in JOBS:
+                JOBS[str(job_id)]['file_path'] = None
+                JOBS[str(job_id)]['status'] = 'deleted'
+                JOBS[str(job_id)]['message'] = 'فایل حذف شد.'
+        return jsonify(success=True)
+    except Exception as e:
+        return jsonify(success=False, error=f'حذف فایل انجام نشد: {e}'), 500
 
 
 @app.get('/api/history')
