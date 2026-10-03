@@ -125,8 +125,11 @@ def network_profiles():
     # can fail with UNEXPECTED_EOF_WHILE_READING on some YouTube routes.
     # Keep a plain and IPv4 fallback for networks where impersonation is unavailable.
     return [
-        {'impersonate': 'chrome'},
-        {'impersonate': 'chrome', 'source_address': '0.0.0.0'},
+        # chrome116 is a known Windows target supported by curl_cffi.
+        # Avoid generic "chrome" because newer curl_cffi versions may select
+        # a different OS target, while older/broken bundles may reject it.
+        {'impersonate': 'chrome116'},
+        {'impersonate': 'chrome116', 'source_address': '0.0.0.0'},
         {},
     ]
 
@@ -165,6 +168,8 @@ def is_network_error(error):
         'network is unreachable',
         'temporary failure in name resolution',
         'failed to resolve',
+        'impersonate target',
+        'curl_cffi',
     ))
 
 
