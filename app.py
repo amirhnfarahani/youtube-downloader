@@ -482,6 +482,29 @@ def api_retry(job_id):
     return jsonify(success=True, job_id=new)
 
 
+@app.post('/api/open/<job_id>')
+def api_open(job_id):
+    j = get_job(job_id)
+    p = j.get('file_path')
+    if not p and str(job_id).isdigit():
+        c = db()
+        row = c.execute('SELECT path FROM history WHERE id=?', (int(job_id),)).fetchone()
+        c.close()
+        if row:
+            p = row['path']
+    if not p or not os.path.isfile(p):
+        return jsonify(success=False, error='فایل پیدا نشد یا حذف شده است.'), 404
+    try:
+        if os.name == 'nt':
+            os.startfile(os.path.normpath(p))
+        else:
+            import subprocess
+            subprocess.Popen(['xdg-open', p])
+        return jsonify(success=True)
+    except Exception as e:
+        return jsonify(success=False, error=f'باز کردن فایل ممکن نیست: {e}'), 500
+
+
 @app.get('/api/file/<job_id>')
 def api_file(job_id):
     j = get_job(job_id)
