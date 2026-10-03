@@ -16,6 +16,8 @@ const history = ref([])
 const playlist = ref(null)
 const selectedItems = ref([])
 const presets = ref([])
+const presetModal = ref(false)
+const presetName = ref('')
 const settings = ref({ theme:'dark', download_path:'downloads', concurrent_downloads:2, speed_limit:0, notifications:true, clipboard_monitor:false })
 const search = ref('')
 const isDark = ref(true)
@@ -109,9 +111,20 @@ async function deletePreset(id){
 async function clearHistory(){ await api('/history',{method:'DELETE'}); await loadHistory() }
 async function deleteHistory(id){ await api('/history/'+id,{method:'DELETE'}); await loadHistory() }
 async function saveSettings(){ await api('/settings',{method:'PUT',body:JSON.stringify(settings.value)}) }
+function openPresetModal(){
+  presetName.value=''
+  presetModal.value=true
+  error.value=''
+}
+function closePresetModal(){
+  presetModal.value=false
+}
 async function savePreset(){
-  const name=prompt('نام Preset را وارد کنید')
-  if(!name) return
+  const name=presetName.value.trim()
+  if(!name){
+    error.value='نام Preset را وارد کنید.'
+    return
+  }
   try {
     await api('/presets',{method:'POST',body:JSON.stringify({
       name,
@@ -121,6 +134,7 @@ async function savePreset(){
       }
     })})
     await loadPresets()
+    closePresetModal()
   } catch(e) { error.value=e.message }
 }
 async function usePreset(p){
@@ -189,7 +203,7 @@ onUnmounted(()=>clearTimeout(timer))
       <div class="hero-card">
         <div class="hero-icon"><Download/></div><h2>لینک YouTube را وارد کنید</h2><p>ویدیو، Playlist و Shorts را با کیفیت دلخواه دانلود کنید.</p>
         <div class="url-row"><input v-model="url" @paste="handlePaste" @keyup.enter="inspect" placeholder="https://www.youtube.com/watch?v=..."/><button class="primary" :disabled="loading" @click="inspect">{{loading?'در حال بررسی...':'بررسی لینک'}} <Search/></button></div>
-        <div class="quick"><button @click="pasteFromClipboard"><Clipboard/> Paste از Clipboard</button><button @click="mediaType='audio'"><Music2/> MP3</button><button @click="mediaType='video'"><Video/> Video</button></div>
+        <div class="quick"><button @click="pasteFromClipboard"><Clipboard/> Paste از Clipboard</button><button :class="{selected:mediaType==='audio'}" @click="mediaType='audio'"><Music2/> MP3</button><button :class="{selected:mediaType==='video'}" @click="mediaType='video'"><Video/> Video</button></div>
       </div>
 
       <div v-if="error" class="alert error"><AlertCircle/> {{error}} <button @click="error=''">×</button></div>
@@ -221,9 +235,20 @@ onUnmounted(()=>clearTimeout(timer))
 <button v-if="item.path" @click="moveFile(item.id)" title="انتقال فایل"><ArrowRightLeft/></button>
 <button v-if="item.path" class="danger" @click="deleteFile(item.id)" title="حذف کامل فایل"><Trash2/></button></div></section>
 
-    <section v-else-if="active==='presets'" class="panel"><div class="section-title"><div><h2>Download Presets</h2><p>تنظیمات آماده برای دانلود سریع</p></div><button class="primary" @click="savePreset"><Plus/> ساخت Preset</button></div><div class="preset-grid"><div v-for="p in presets" :key="p.id" class="preset"><Zap/><h3>{{p.name}}</h3><p>{{p.settings?.mediaType||'video'}} · {{p.settings?.quality||'best'}}</p><div class="preset-actions"><button @click="usePreset(p)">استفاده</button><button class="danger" @click="deletePreset(p.id)">حذف</button></div></div></div></section>
+    <section v-else-if="active==='presets'" class="panel"><div class="section-title"><div><h2>Download Presets</h2><p>تنظیمات آماده برای دانلود سریع</p></div><button class="primary" @click="openPresetModal"><Plus/> ساخت Preset</button></div><div class="preset-grid"><div v-for="p in presets" :key="p.id" class="preset"><Zap/><h3>{{p.name}}</h3><p>{{p.settings?.mediaType||'video'}} · {{p.settings?.quality||'best'}}</p><div class="preset-actions"><button @click="usePreset(p)">استفاده</button><button class="danger" @click="deletePreset(p.id)">حذف</button></div></div></div></section>
 
     <section v-else class="panel settings"><h2>تنظیمات</h2><label>مسیر دانلود<input v-model="settings.download_path"/></label><label>تعداد دانلود همزمان<input type="number" min="1" max="5" v-model.number="settings.concurrent_downloads"/></label><label>محدودیت سرعت (KB/s، صفر = بدون محدودیت)<input type="number" min="0" v-model.number="settings.speed_limit"/></label><label class="switch"><input type="checkbox" v-model="settings.notifications"/> اعلان پایان دانلود</label><label class="switch"><input type="checkbox" v-model="settings.clipboard_monitor"/> مانیتور Clipboard</label><button class="primary" @click="saveSettings">ذخیره تنظیمات</button></section>
   </main>
+  <div v-if="presetModal" class="modal-backdrop" @click.self="closePresetModal">
+    <div class="modal-card">
+      <div class="section-title">
+        <div><h2>ساخت Preset</h2><p>تنظیمات فعلی ذخیره می‌شوند.</p></div>
+        <button class="icon-btn" @click="closePresetModal"><X/></button>
+      </div>
+      <label>نام Preset<input v-model="presetName" @keyup.enter="savePreset" autofocus placeholder="مثلاً YouTube 1080p"/></label>
+      <div class="preset-preview"><span>{{mediaType==='audio'?'MP3 / Audio':'Video'}}</span><span>{{selectedQuality==='best'?'بهترین کیفیت':selectedQuality+'p'}}</span></div>
+      <div class="modal-actions"><button class="secondary" @click="closePresetModal">لغو</button><button class="primary" @click="savePreset"><Plus/> ذخیره Preset</button></div>
+    </div>
+  </div>
 </div>
 </template>
