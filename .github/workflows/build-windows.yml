@@ -114,19 +114,19 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch --tags
-          if (git tag -l "v1.0.0") {
-            git tag -f v1.0.0
-            git push origin refs/tags/v1.0.0 --force
+          if (git tag -l "v1.0.1") {
+            git tag -f v1.0.1
+            git push origin refs/tags/v1.0.1 --force
           } else {
-            git tag v1.0.0
-            git push origin v1.0.0
+            git tag v1.0.1
+            git push origin v1.0.1
           }
 
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0
+          tag_name: v1.0.1
           files: |
             release/YouTubeDownloader.exe
             release/YouTubeDownloader-Portable.zip
