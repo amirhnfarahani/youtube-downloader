@@ -91,6 +91,8 @@ def human_error(error):
     low = text.lower()
     if any(x in low for x in ('failed to resolve', 'getaddrinfo failed', 'name or service not known', 'dns')):
         return 'اتصال DNS برقرار نشد. اینترنت، DNS یا VPN/Proxy را بررسی کنید.'
+    if any(x in low for x in ('unexpected_eof', 'ssleoferror', '[ssl:', 'ssl: unexpected_eof')):
+        return 'اتصال امن به YouTube در میانه ارتباط قطع شد. برنامه روش اتصال جایگزین و تلاش مجدد را امتحان می‌کند.'
     if '10054' in low or 'connection forcibly closed' in low or 'connection reset' in low:
         return 'ارتباط YouTube توسط سرور یا مسیر شبکه قطع شد. برنامه روش‌های اتصال جایگزین را خودکار امتحان می‌کند.'
     if any(x in low for x in ('timed out', 'timeout', 'connection aborted', 'network is unreachable')):
@@ -99,7 +101,10 @@ def human_error(error):
         return 'FFmpeg نصب نیست و برای تبدیل یا ادغام صدا و تصویر لازم است.'
     if 'requested format is not available' in low:
         return 'کیفیت انتخاب‌شده در دسترس نیست. کیفیت دیگری را امتحان کنید.'
-    return re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', text) or 'دانلود با خطای ناشناخته مواجه شد.'
+    cleaned = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', text).strip()
+    if not cleaned:
+        return 'دانلود ناموفق شد؛ جزئیات خطا از طرف کتابخانه دریافت نشد.'
+    return cleaned[:700]
 
 
 def ffmpeg_options():
@@ -431,7 +436,8 @@ def run_download(job_id, url, quality, media_type='video'):
                 release_download_slot()
 
     cleanup_job_files(get_settings().get('download_path') or DOWNLOAD_FOLDER, job_id)
-    set_job(job_id, status='error', message='دانلود ناموفق بود.', error=human_error(last_error), connection_state='failed')
+    detail = human_error(last_error)
+    set_job(job_id, status='error', message=detail, error=detail, raw_error=str(last_error or ''), connection_state='failed')
 
 
 @app.post('/api/download')
