@@ -116,12 +116,13 @@ def node_runtime_options():
 
 
 def network_profiles():
-    # Try the normal transport first. If YouTube resets the connection,
-    # retry with browser impersonation and finally with IPv4.
+    # Prefer curl_cffi/Chrome impersonation first. Python's urllib SSL stack
+    # can fail with UNEXPECTED_EOF_WHILE_READING on some YouTube routes.
+    # Keep a plain and IPv4 fallback for networks where impersonation is unavailable.
     return [
-        {},
         {'impersonate': 'chrome'},
         {'impersonate': 'chrome', 'source_address': '0.0.0.0'},
+        {},
     ]
 
 
@@ -151,6 +152,9 @@ def is_network_error(error):
         'connection forcibly closed',
         'connection aborted',
         'transporterror',
+        'unexpected_eof_while_reading',
+        'ssleoferror',
+        '[ssl:',
         'timed out',
         'timeout',
         'network is unreachable',
@@ -281,6 +285,11 @@ def download_options(job_id, url, quality, media_type, profile=None):
         'file_access_retries': 5,
         'socket_timeout': 30,
         'continuedl': True,
+        'retry_sleep_functions': {
+            'http': lambda n: min(8, 1.5 * n),
+            'fragment': lambda n: min(8, 1.5 * n),
+            'extractor': lambda n: min(8, 1.5 * n),
+        },
     }
     if profile:
         opts.update(profile)
