@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { Download, History, Settings, ListVideo, Sun, Moon, Clipboard, X, RotateCcw, FolderOpen, Trash2, Play, Pause, Search, Plus, Zap, Music2, Video, Image, CheckCircle2, AlertCircle } from 'lucide-vue-next'
+import { Download, History, Settings, ListVideo, Sun, Moon, Clipboard, X, RotateCcw, FolderOpen, Trash2, ArrowRightLeft, Play, Pause, Search, Plus, Zap, Music2, Video, Image, CheckCircle2, AlertCircle } from 'lucide-vue-next'
 
 const API = '/api'
 const url = ref('')
@@ -81,8 +81,17 @@ async function poll() {
 function startPolling(){clearTimeout(timer); poll()}
 async function cancel(id){ await api('/cancel/'+id,{method:'POST'}); startPolling() }
 async function retry(j){ if(j.url) await startDownload(j.url,j.quality,j.media_type) }
-async function openFile(id){
-  try { await api('/open/'+id,{method:'POST'}) }
+async function revealFile(id){
+  try { await api('/reveal/'+id,{method:'POST'}) }
+  catch(e){ if (!e.message.includes('لغو')) error.value=e.message }
+}
+async function moveFile(id){
+  try { await api('/move/'+id,{method:'POST'}); await loadHistory() }
+  catch(e){ if (!e.message.includes('لغو')) error.value=e.message }
+}
+async function deleteFile(id){
+  if (!confirm('این فایل برای همیشه از کامپیوتر حذف شود؟')) return
+  try { await api('/file/'+id,{method:'DELETE'}); jobs.value=jobs.value.filter(j=>j.id!==id); await loadHistory() }
   catch(e){ error.value=e.message }
 }
 async function loadHistory(){ history.value=(await api('/history')).items }
@@ -164,12 +173,22 @@ onUnmounted(()=>clearTimeout(timer))
 
       <div v-if="playlist" class="playlist-card"><div class="section-title"><div><span class="pill">PLAYLIST</span><h2>{{playlist.title}}</h2><p>{{playlist.count}} ویدیو</p></div><button class="primary" @click="downloadPlaylist"><Download/> دانلود انتخاب‌ها</button></div><div class="playlist-tools"><button @click="selectedItems=playlist.entries.map(x=>x.index)">انتخاب همه</button><button @click="selectedItems=[]">لغو همه</button></div><label v-for="item in playlist.entries" :key="item.index" class="playlist-item"><input type="checkbox" :value="item.index" v-model="selectedItems"/><img :src="item.thumbnail"/><div><b>{{item.title}}</b><small>{{item.duration?Math.floor(item.duration/60)+' دقیقه':''}}</small></div></label></div>
 
-      <div v-if="jobs.length" class="jobs"><div class="section-title"><h2>دانلودهای اخیر</h2><button @click="active='queue'">مشاهده همه</button></div><div v-for="j in jobs.slice(0,3)" :key="j.id" class="job"><div class="job-head"><b>{{j.message}}</b><strong>{{j.percent||0}}%</strong></div><div class="progress"><i :style="{width:(j.percent||0)+'%'}"></i></div><div class="job-meta"><span>{{j.downloaded||'—'}} / {{j.total||'—'}}</span><span>{{j.speed||'—'}}</span><button v-if="!['completed','error','cancelled'].includes(j.status)" @click="cancel(j.id)"><X/> لغو</button><button v-if="j.status==='completed'" @click="openFile(j.id)"><FolderOpen/> باز کردن</button></div></div></div>
+      <div v-if="jobs.length" class="jobs"><div class="section-title"><h2>دانلودهای اخیر</h2><button @click="active='queue'">مشاهده همه</button></div><div v-for="j in jobs.slice(0,3)" :key="j.id" class="job"><div class="job-head"><b>{{j.message}}</b><strong>{{j.percent||0}}%</strong></div><div class="progress"><i :style="{width:(j.percent||0)+'%'}"></i></div><div class="job-meta"><span>{{j.downloaded||'—'}} / {{j.total||'—'}}</span><span>{{j.speed||'—'}}</span><button v-if="!['completed','error','cancelled'].includes(j.status)" @click="cancel(j.id)"><X/> لغو</button><template v-if="j.status==='completed'">
+<button @click="revealFile(j.id)" title="نمایش فایل در پوشه"><FolderOpen/> پوشه</button>
+<button @click="moveFile(j.id)" title="انتقال فایل"><ArrowRightLeft/> انتقال</button>
+<button class="danger" @click="deleteFile(j.id)" title="حذف کامل فایل"><Trash2/> حذف</button>
+</template></div></div></div>
     </section>
 
-    <section v-else-if="active==='queue'" class="panel"><div class="section-title"><div><h2>صف دانلود</h2><p>{{jobs.length}} عملیات ثبت شده</p></div></div><div v-if="!jobs.length" class="empty"><ListVideo/><h3>صف خالی است</h3><p>دانلود جدید را از صفحه اصلی اضافه کنید.</p></div><div v-for="j in jobs" :key="j.id" class="job big"><div class="job-head"><div><b>{{j.filename||j.message}}</b><small>{{j.status}}</small></div><strong>{{j.percent||0}}%</strong></div><div class="progress"><i :style="{width:(j.percent||0)+'%'}"></i></div><div class="job-meta"><span>{{j.speed||'—'}} · {{j.eta||'—'}}</span><button v-if="!['completed','error','cancelled'].includes(j.status)" @click="cancel(j.id)"><X/> لغو</button><button v-if="j.status==='error'" @click="retry(j)"><RotateCcw/> تلاش مجدد</button><button v-if="j.status==='completed'" @click="openFile(j.id)"><FolderOpen/> باز کردن</button></div></div></section>
+    <section v-else-if="active==='queue'" class="panel"><div class="section-title"><div><h2>صف دانلود</h2><p>{{jobs.length}} عملیات ثبت شده</p></div></div><div v-if="!jobs.length" class="empty"><ListVideo/><h3>صف خالی است</h3><p>دانلود جدید را از صفحه اصلی اضافه کنید.</p></div><div v-for="j in jobs" :key="j.id" class="job big"><div class="job-head"><div><b>{{j.filename||j.message}}</b><small>{{j.status}}</small></div><strong>{{j.percent||0}}%</strong></div><div class="progress"><i :style="{width:(j.percent||0)+'%'}"></i></div><div class="job-meta"><span>{{j.speed||'—'}} · {{j.eta||'—'}}</span><button v-if="!['completed','error','cancelled'].includes(j.status)" @click="cancel(j.id)"><X/> لغو</button><button v-if="j.status==='error'" @click="retry(j)"><RotateCcw/> تلاش مجدد</button><template v-if="j.status==='completed'">
+<button @click="revealFile(j.id)" title="نمایش فایل در پوشه"><FolderOpen/> پوشه</button>
+<button @click="moveFile(j.id)" title="انتقال فایل"><ArrowRightLeft/> انتقال</button>
+<button class="danger" @click="deleteFile(j.id)" title="حذف کامل فایل"><Trash2/> حذف</button>
+</template></div></div></section>
 
-    <section v-else-if="active==='history'" class="panel"><div class="section-title"><div><h2>تاریخچه دانلود</h2><p>تمام فایل‌های قبلی</p></div><div class="actions"><div class="search"><Search/><input v-model="search" placeholder="جستجو..."/></div><button class="danger" @click="clearHistory"><Trash2/> پاک کردن</button></div></div><div v-if="!visibleHistory.length" class="empty"><History/><h3>تاریخچه‌ای وجود ندارد</h3></div><div v-for="item in visibleHistory" :key="item.id" class="history-item"><div class="history-icon">{{item.media_type==='audio'?'♫':'▶'}}</div><div class="history-info"><b>{{item.title}}</b><small>{{item.quality}} · {{item.media_type}} · {{item.size?Math.round(item.size/1024/1024)+' MB':'—'}}</small></div><button v-if="item.path" @click="openFile(item.id)" title="باز کردن فایل"><FolderOpen/></button><button @click="deleteHistory(item.id)"><Trash2/></button></div></section>
+    <section v-else-if="active==='history'" class="panel"><div class="section-title"><div><h2>تاریخچه دانلود</h2><p>تمام فایل‌های قبلی</p></div><div class="actions"><div class="search"><Search/><input v-model="search" placeholder="جستجو..."/></div><button class="danger" @click="clearHistory"><Trash2/> پاک کردن</button></div></div><div v-if="!visibleHistory.length" class="empty"><History/><h3>تاریخچه‌ای وجود ندارد</h3></div><div v-for="item in visibleHistory" :key="item.id" class="history-item"><div class="history-icon">{{item.media_type==='audio'?'♫':'▶'}}</div><div class="history-info"><b>{{item.title}}</b><small>{{item.quality}} · {{item.media_type}} · {{item.size?Math.round(item.size/1024/1024)+' MB':'—'}}</small></div><button v-if="item.path" @click="revealFile(item.id)" title="نمایش در پوشه"><FolderOpen/></button>
+<button v-if="item.path" @click="moveFile(item.id)" title="انتقال فایل"><ArrowRightLeft/></button>
+<button v-if="item.path" class="danger" @click="deleteFile(item.id)" title="حذف کامل فایل"><Trash2/></button></div></section>
 
     <section v-else-if="active==='presets'" class="panel"><div class="section-title"><div><h2>Download Presets</h2><p>تنظیمات آماده برای دانلود سریع</p></div><button class="primary" @click="savePreset"><Plus/> ساخت Preset</button></div><div class="preset-grid"><div v-for="p in presets" :key="p.id" class="preset"><Zap/><h3>{{p.name}}</h3><p>{{p.settings.mediaType||'video'}} · {{p.settings.quality||'best'}}</p><button @click="usePreset(p)">استفاده</button></div></div></section>
 
