@@ -124,7 +124,7 @@ The project specifically handles errors such as:
 
 A network problem outside the application cannot always be repaired by software. If `googlevideo.com` cannot be resolved or your ISP/network blocks the connection, check the system's DNS, VPN, Proxy, firewall and internet connection.
 
-yt-dlp supports browser impersonation through `curl_cffi`; available impersonation targets depend on the installed `curl_cffi` version. citeturn0search1turn0search2
+yt-dlp supports browser impersonation through `curl_cffi`; available impersonation targets depend on the installed `curl_cffi` version.
 
 ## 🪟 Windows Desktop Application
 
@@ -289,7 +289,7 @@ pywebview
 pyperclip
 ```
 
-The `curl_cffi` dependency is important for the application's network/impersonation fallback. yt-dlp documents `curl_cffi` as the handler used for browser impersonation. citeturn0search1turn0search2
+The `curl_cffi` dependency is important for the application's network/impersonation fallback. yt-dlp documents `curl_cffi` as the handler used for browser impersonation.
 
 ## ▶️ Development
 
@@ -489,7 +489,7 @@ Also check:
 - Antivirus HTTPS inspection
 - ISP/network restrictions
 
-The project includes `curl_cffi` support because yt-dlp uses it for browser impersonation targets. The exact targets available depend on the installed `curl_cffi` version. citeturn0search1
+The project includes `curl_cffi` support because yt-dlp uses it for browser impersonation targets. The exact targets available depend on the installed `curl_cffi` version.
 
 ### Windows `WinError 10054`
 
@@ -519,7 +519,7 @@ You can inspect available targets with:
 yt-dlp --list-impersonate-targets
 ```
 
-yt-dlp documents the `--list-impersonate-targets` and `--impersonate` options for checking and selecting available targets. citeturn0search2
+yt-dlp documents the `--list-impersonate-targets` and `--impersonate` options for checking and selecting available targets.
 
 ### FFmpeg is not found
 
