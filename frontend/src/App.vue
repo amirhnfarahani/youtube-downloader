@@ -179,7 +179,6 @@ onUnmounted(()=>clearTimeout(timer))
 
       <div v-if="jobs.length" class="jobs"><div class="section-title"><h2>دانلودهای اخیر</h2><button @click="active='queue'">مشاهده همه</button></div><div v-for="j in jobs.slice(0,3)" :key="j.id" class="job"><div class="job-head"><b>{{j.message}}</b><strong>{{j.percent||0}}%</strong></div><div class="progress"><i :style="{width:(j.percent||0)+'%'}"></i></div><div class="job-meta"><span>{{j.downloaded||'—'}} / {{j.total||'—'}}</span><span>{{j.speed||'—'}}</span><button v-if="!['completed','error','cancelled'].includes(j.status)" @click="cancel(j.id)"><X/> لغو</button><template v-if="j.status==='completed'">
 <button @click="openFile(j.id)" title="باز کردن ویدیو با برنامه پیش‌فرض"><Play/> باز کردن</button>
-<button @click="openFile(j.id)" title="باز کردن ویدیو با برنامه پیش‌فرض"><Play/> باز کردن</button>
 <button @click="revealFile(j.id)" title="نمایش فایل در پوشه"><FolderOpen/> پوشه</button>
 <button @click="moveFile(j.id)" title="انتقال فایل"><ArrowRightLeft/> انتقال</button>
 <button class="danger" @click="deleteFile(j.id)" title="حذف کامل فایل"><Trash2/> حذف</button>
@@ -187,6 +186,7 @@ onUnmounted(()=>clearTimeout(timer))
     </section>
 
     <section v-else-if="active==='queue'" class="panel"><div class="section-title"><div><h2>صف دانلود</h2><p>{{jobs.length}} عملیات ثبت شده</p></div></div><div v-if="!jobs.length" class="empty"><ListVideo/><h3>صف خالی است</h3><p>دانلود جدید را از صفحه اصلی اضافه کنید.</p></div><div v-for="j in jobs" :key="j.id" class="job big"><div class="job-head"><div><b>{{j.filename||j.message}}</b><small>{{j.status}}</small></div><strong>{{j.percent||0}}%</strong></div><div class="progress"><i :style="{width:(j.percent||0)+'%'}"></i></div><div class="job-meta"><span>{{j.speed||'—'}} · {{j.eta||'—'}}</span><button v-if="!['completed','error','cancelled'].includes(j.status)" @click="cancel(j.id)"><X/> لغو</button><button v-if="j.status==='error'" @click="retry(j)"><RotateCcw/> تلاش مجدد</button><template v-if="j.status==='completed'">
+<button @click="openFile(j.id)" title="باز کردن ویدیو با برنامه پیش‌فرض"><Play/> باز کردن</button>
 <button @click="revealFile(j.id)" title="نمایش فایل در پوشه"><FolderOpen/> پوشه</button>
 <button @click="moveFile(j.id)" title="انتقال فایل"><ArrowRightLeft/> انتقال</button>
 <button class="danger" @click="deleteFile(j.id)" title="حذف کامل فایل"><Trash2/> حذف</button>
