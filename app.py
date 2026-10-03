@@ -86,8 +86,27 @@ def format_eta(seconds):
     return f'{s//60}:{s%60:02d}'
 
 
+def error_text(error):
+    """Extract a useful message from yt-dlp/Python exceptions, even when str(error) is empty."""
+    if error is None:
+        return ''
+    candidates = []
+    for value in (
+        getattr(error, 'msg', None),
+        str(error),
+        getattr(getattr(error, 'exc_info', None), 'value', None),
+        getattr(error, '__cause__', None),
+        getattr(error, '__context__', None),
+    ):
+        if value is None:
+            continue
+        value = str(value).strip()
+        if value and value not in candidates:
+            candidates.append(value)
+    return ' | '.join(candidates)
+
 def human_error(error):
-    text = str(error or '').strip()
+    text = error_text(error)
     low = text.lower()
     if any(x in low for x in ('failed to resolve', 'getaddrinfo failed', 'name or service not known', 'dns')):
         return 'اتصال DNS برقرار نشد. اینترنت، DNS یا VPN/Proxy را بررسی کنید.'
@@ -103,8 +122,14 @@ def human_error(error):
         return 'کیفیت انتخاب‌شده در دسترس نیست. کیفیت دیگری را امتحان کنید.'
     cleaned = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', text).strip()
     if not cleaned:
-        return 'دانلود ناموفق شد؛ جزئیات خطا از طرف کتابخانه دریافت نشد.'
+        return 'دانلود ناموفق شد؛ کتابخانه خطای متنی برنگرداند. جزئیات فنی را در گزارش خطا ذخیره کرده‌ایم.'
     return cleaned[:700]
+
+def technical_error(error):
+    text = error_text(error)
+    if not text:
+        return 'Unknown yt-dlp error'
+    return re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', text).strip()[:3000]
 
 
 def ffmpeg_options():
@@ -442,7 +467,7 @@ def run_download(job_id, url, quality, media_type='video'):
 
     cleanup_job_files(get_settings().get('download_path') or DOWNLOAD_FOLDER, job_id)
     detail = human_error(last_error)
-    set_job(job_id, status='error', message=detail, error=detail, raw_error=str(last_error or ''), connection_state='failed')
+    set_job(job_id, status='error', message=detail, error=detail, raw_error=technical_error(last_error), connection_state='failed')
 
 
 @app.post('/api/download')
