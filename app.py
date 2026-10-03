@@ -543,6 +543,23 @@ def open_folder_dialog():
         return None
 
 
+@app.post('/api/open/<job_id>')
+def api_open(job_id):
+    path, _ = resolve_file_record(job_id)
+    if not path or not os.path.isfile(path):
+        return jsonify(success=False, error='فایل پیدا نشد یا حذف شده است.'), 404
+    try:
+        path = os.path.abspath(path)
+        if os.name == 'nt':
+            os.startfile(path)
+        else:
+            import subprocess
+            subprocess.Popen(['xdg-open', path])
+        return jsonify(success=True, path=path)
+    except Exception as e:
+        return jsonify(success=False, error=f'باز کردن فایل ممکن نیست: {e}'), 500
+
+
 @app.post('/api/reveal/<job_id>')
 def api_reveal(job_id):
     path, _ = resolve_file_record(job_id)
