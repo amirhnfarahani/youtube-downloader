@@ -34,6 +34,7 @@ exe = EXE(
     a.datas,
     [],
     name="YouTubeDownloader",
+    icon=str(ROOT / "build/windows/youtube-purple.ico"),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
