@@ -81,6 +81,10 @@ async function poll() {
 function startPolling(){clearTimeout(timer); poll()}
 async function cancel(id){ await api('/cancel/'+id,{method:'POST'}); startPolling() }
 async function retry(j){ if(j.url) await startDownload(j.url,j.quality,j.media_type) }
+async function openFile(id){
+  try { await api('/open/'+id,{method:'POST'}) }
+  catch(e){ error.value=e.message }
+}
 async function revealFile(id){
   try { await api('/reveal/'+id,{method:'POST'}) }
   catch(e){ if (!e.message.includes('لغو')) error.value=e.message }
@@ -174,6 +178,8 @@ onUnmounted(()=>clearTimeout(timer))
       <div v-if="playlist" class="playlist-card"><div class="section-title"><div><span class="pill">PLAYLIST</span><h2>{{playlist.title}}</h2><p>{{playlist.count}} ویدیو</p></div><button class="primary" @click="downloadPlaylist"><Download/> دانلود انتخاب‌ها</button></div><div class="playlist-tools"><button @click="selectedItems=playlist.entries.map(x=>x.index)">انتخاب همه</button><button @click="selectedItems=[]">لغو همه</button></div><label v-for="item in playlist.entries" :key="item.index" class="playlist-item"><input type="checkbox" :value="item.index" v-model="selectedItems"/><img :src="item.thumbnail"/><div><b>{{item.title}}</b><small>{{item.duration?Math.floor(item.duration/60)+' دقیقه':''}}</small></div></label></div>
 
       <div v-if="jobs.length" class="jobs"><div class="section-title"><h2>دانلودهای اخیر</h2><button @click="active='queue'">مشاهده همه</button></div><div v-for="j in jobs.slice(0,3)" :key="j.id" class="job"><div class="job-head"><b>{{j.message}}</b><strong>{{j.percent||0}}%</strong></div><div class="progress"><i :style="{width:(j.percent||0)+'%'}"></i></div><div class="job-meta"><span>{{j.downloaded||'—'}} / {{j.total||'—'}}</span><span>{{j.speed||'—'}}</span><button v-if="!['completed','error','cancelled'].includes(j.status)" @click="cancel(j.id)"><X/> لغو</button><template v-if="j.status==='completed'">
+<button @click="openFile(j.id)" title="باز کردن ویدیو با برنامه پیش‌فرض"><Play/> باز کردن</button>
+<button @click="openFile(j.id)" title="باز کردن ویدیو با برنامه پیش‌فرض"><Play/> باز کردن</button>
 <button @click="revealFile(j.id)" title="نمایش فایل در پوشه"><FolderOpen/> پوشه</button>
 <button @click="moveFile(j.id)" title="انتقال فایل"><ArrowRightLeft/> انتقال</button>
 <button class="danger" @click="deleteFile(j.id)" title="حذف کامل فایل"><Trash2/> حذف</button>
@@ -186,7 +192,8 @@ onUnmounted(()=>clearTimeout(timer))
 <button class="danger" @click="deleteFile(j.id)" title="حذف کامل فایل"><Trash2/> حذف</button>
 </template></div></div></section>
 
-    <section v-else-if="active==='history'" class="panel"><div class="section-title"><div><h2>تاریخچه دانلود</h2><p>تمام فایل‌های قبلی</p></div><div class="actions"><div class="search"><Search/><input v-model="search" placeholder="جستجو..."/></div><button class="danger" @click="clearHistory"><Trash2/> پاک کردن</button></div></div><div v-if="!visibleHistory.length" class="empty"><History/><h3>تاریخچه‌ای وجود ندارد</h3></div><div v-for="item in visibleHistory" :key="item.id" class="history-item"><div class="history-icon">{{item.media_type==='audio'?'♫':'▶'}}</div><div class="history-info"><b>{{item.title}}</b><small>{{item.quality}} · {{item.media_type}} · {{item.size?Math.round(item.size/1024/1024)+' MB':'—'}}</small></div><button v-if="item.path" @click="revealFile(item.id)" title="نمایش در پوشه"><FolderOpen/></button>
+    <section v-else-if="active==='history'" class="panel"><div class="section-title"><div><h2>تاریخچه دانلود</h2><p>تمام فایل‌های قبلی</p></div><div class="actions"><div class="search"><Search/><input v-model="search" placeholder="جستجو..."/></div><button class="danger" @click="clearHistory"><Trash2/> پاک کردن</button></div></div><div v-if="!visibleHistory.length" class="empty"><History/><h3>تاریخچه‌ای وجود ندارد</h3></div><div v-for="item in visibleHistory" :key="item.id" class="history-item"><div class="history-icon">{{item.media_type==='audio'?'♫':'▶'}}</div><div class="history-info"><b>{{item.title}}</b><small>{{item.quality}} · {{item.media_type}} · {{item.size?Math.round(item.size/1024/1024)+' MB':'—'}}</small></div><button v-if="item.path" @click="openFile(item.id)" title="باز کردن فایل"><Play/></button>
+<button v-if="item.path" @click="revealFile(item.id)" title="نمایش در پوشه"><FolderOpen/></button>
 <button v-if="item.path" @click="moveFile(item.id)" title="انتقال فایل"><ArrowRightLeft/></button>
 <button v-if="item.path" class="danger" @click="deleteFile(item.id)" title="حذف کامل فایل"><Trash2/></button></div></section>
 
