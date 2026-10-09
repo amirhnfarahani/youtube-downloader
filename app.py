@@ -390,6 +390,8 @@ def find_output_file(folder, job_id, media_type='video'):
         path for path in glob.glob(os.path.join(folder, job_id + '.*'))
         if os.path.isfile(path)
         and not path.endswith('.part')
+        # Format-specific fragments such as job-id.f137.webm are not a final merged file.
+        and not re.search(r'\.f\d+\.', os.path.basename(path), re.IGNORECASE)
         and os.path.splitext(path)[1].lower() in media_extensions
         and (media_type != 'audio' or os.path.splitext(path)[1].lower() in audio_extensions)
     ]
