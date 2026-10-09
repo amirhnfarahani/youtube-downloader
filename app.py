@@ -457,7 +457,7 @@ def run_download(job_id, url, quality, media_type='video'):
             if last_profile_error is not None:
                 raise last_profile_error
 
-source = find_output_file(folder, job_id, media_type)
+            source = find_output_file(folder, job_id, media_type)
             ext = os.path.splitext(source)[1] or ('.mp3' if media_type == 'audio' else '.mp4')
             base = clean_title(title)
             with FILE_NAME_LOCK:
