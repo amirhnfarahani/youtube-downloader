@@ -10,6 +10,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 import urllib.request
+from urllib.parse import urlparse
 import sys
 import socket
 
@@ -26,7 +27,7 @@ else:
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, 'downloads')
 FRONTEND_DIST = os.path.join(RESOURCE_DIR, 'frontend', 'dist')
 STATIC_FOLDER = os.path.join(RESOURCE_DIR, 'static')
-DB_PATH = os.path.join(BASE_DIR, 'downloader.db')
+DB_PATH = os.environ.get('YTDOWNLOADER_DB_PATH', os.path.join(BASE_DIR, 'downloader.db'))
 BUNDLED_FFMPEG = os.path.join(RESOURCE_DIR, 'ffmpeg.exe')
 BUNDLED_NODE = os.path.join(RESOURCE_DIR, 'node.exe')
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -198,7 +199,17 @@ def is_network_error(error):
     ))
 
 
+def valid_media_url(url):
+    try:
+        parsed = urlparse(str(url or '').strip())
+        return parsed.scheme.lower() in ('http', 'https') and bool(parsed.netloc)
+    except (TypeError, ValueError):
+        return False
+
+
 def extract(url, playlist=False):
+    if not valid_media_url(url):
+        raise ValueError('لینک معتبر نیست؛ آدرس باید با http:// یا https:// شروع شود.')
     profiles = network_profiles()
     last_error = None
     for profile_index, profile in enumerate(profiles, 1):
@@ -244,14 +255,17 @@ def api_clipboard():
 @app.get('/api/health')
 def health():
     ffmpeg_ok = os.path.isfile(BUNDLED_FFMPEG) or bool(shutil.which('ffmpeg'))
-    return jsonify(success=True, yt_dlp=getattr(yt_dlp, 'version', 'unknown'), ffmpeg=ffmpeg_ok, node=bool(shutil.which('node')), disk_free=shutil.disk_usage(BASE_DIR).free)
+    # Packaged builds ship node.exe beside the application resources. Checking
+    # PATH alone incorrectly reports Node as missing in portable/installer builds.
+    node_ok = os.path.isfile(BUNDLED_NODE) or bool(shutil.which('node'))
+    return jsonify(success=True, yt_dlp=getattr(yt_dlp, 'version', 'unknown'), ffmpeg=ffmpeg_ok, node=node_ok, disk_free=shutil.disk_usage(BASE_DIR).free)
 
 
 @app.post('/api/info')
 def api_info():
     url = str((request.get_json(silent=True) or {}).get('url', '')).strip()
-    if not url:
-        return jsonify(success=False, error='لینک را وارد کنید.'), 400
+    if not valid_media_url(url):
+        return jsonify(success=False, error='لینک معتبر نیست؛ آدرس باید با http:// یا https:// شروع شود.'), 400
     try:
         is_playlist = bool(re.search(r'[?&](list|playlist)=', url, re.I) or '/playlist' in url.lower())
         info = extract(url, playlist=is_playlist)
@@ -265,8 +279,8 @@ def api_info():
 @app.post('/api/playlist')
 def api_playlist():
     url = str((request.get_json(silent=True) or {}).get('url', '')).strip()
-    if not url:
-        return jsonify(success=False, error='لینک Playlist را وارد کنید.'), 400
+    if not valid_media_url(url):
+        return jsonify(success=False, error='لینک Playlist معتبر نیست؛ آدرس باید با http:// یا https:// شروع شود.'), 400
     try:
         info = extract(url, playlist=True)
         entries = []
@@ -369,6 +383,23 @@ def cleanup_job_files(folder, job_id):
             pass
 
 
+def find_output_file(folder, job_id, media_type='video'):
+    media_extensions = {'.mp4', '.m4v', '.mkv', '.webm', '.mov', '.avi', '.flv', '.mp3', '.m4a', '.opus', '.wav', '.aac', '.flac', '.ogg'}
+    audio_extensions = {'.mp3', '.m4a', '.opus', '.wav', '.aac', '.flac', '.ogg'}
+    files = [
+        path for path in glob.glob(os.path.join(folder, job_id + '.*'))
+        if os.path.isfile(path)
+        and not path.endswith('.part')
+        # Format-specific fragments such as job-id.f137.webm are not a final merged file.
+        and not re.search(r'\.f\d+\.', os.path.basename(path), re.IGNORECASE)
+        and os.path.splitext(path)[1].lower() in media_extensions
+        and (media_type != 'audio' or os.path.splitext(path)[1].lower() in audio_extensions)
+    ]
+    if not files:
+        raise RuntimeError('فایل رسانه خروجی پیدا نشد؛ فایل تصویر بندانگشتی به‌عنوان دانلود پذیرفته نمی‌شود.')
+    return max(files, key=os.path.getmtime)
+
+
 def run_download(job_id, url, quality, media_type='video'):
     event = CANCEL_EVENTS[job_id]
     last_error = None
@@ -426,10 +457,7 @@ def run_download(job_id, url, quality, media_type='video'):
             if last_profile_error is not None:
                 raise last_profile_error
 
-            files = [f for f in glob.glob(os.path.join(folder, job_id + '.*')) if not f.endswith('.part')]
-            if not files:
-                raise RuntimeError('فایل خروجی پیدا نشد')
-            source = max(files, key=os.path.getmtime)
+            source = find_output_file(folder, job_id, media_type)
             ext = os.path.splitext(source)[1] or ('.mp3' if media_type == 'audio' else '.mp4')
             base = clean_title(title)
             with FILE_NAME_LOCK:
@@ -476,8 +504,15 @@ def api_download():
     url = str(d.get('url', '')).strip()
     quality = str(d.get('quality', 'best'))
     media_type = str(d.get('media_type', 'video'))
-    if not url:
-        return jsonify(success=False, error='لینک وارد نشده است.'), 400
+    if not valid_media_url(url):
+        return jsonify(success=False, error='لینک معتبر نیست؛ آدرس باید با http:// یا https:// شروع شود.'), 400
+    if media_type not in ('video', 'audio'):
+        return jsonify(success=False, error='نوع رسانه معتبر نیست.'), 400
+    if quality != 'best':
+        try:
+            quality = str(max(144, min(4320, int(quality))))
+        except (TypeError, ValueError):
+            return jsonify(success=False, error='کیفیت انتخاب‌شده معتبر نیست.'), 400
     job_id = str(uuid.uuid4())
     JOBS[job_id] = {'id': job_id, 'url': url, 'quality': quality, 'media_type': media_type, 'status': 'queued', 'percent': 0, 'message': 'در صف دانلود...', 'retry_count': 0, 'created_at': time.time()}
     CANCEL_EVENTS[job_id] = threading.Event()
@@ -547,15 +582,26 @@ def api_file(job_id):
 @app.post('/api/thumbnail')
 def api_thumbnail():
     url = str((request.get_json(silent=True) or {}).get('url', '')).strip()
+    if not valid_media_url(url):
+        return jsonify(success=False, error='لینک معتبر نیست؛ آدرس باید با http:// یا https:// شروع شود.'), 400
     try:
         info = extract(url)
         thumb = info.get('thumbnail')
         if not thumb:
             raise RuntimeError('Thumbnail پیدا نشد')
-        name = clean_title(info.get('title')) + '_thumbnail.jpg'
-        path = os.path.join(DOWNLOAD_FOLDER, name)
-        with urllib.request.urlopen(thumb, timeout=20) as response, open(path, 'wb') as out:
-            shutil.copyfileobj(response, out)
+        folder = get_settings().get('download_path') or DOWNLOAD_FOLDER
+        os.makedirs(folder, exist_ok=True)
+        base_name = clean_title(info.get('title')) + '_thumbnail'
+        name = base_name + '.jpg'
+        path = os.path.join(folder, name)
+        with FILE_NAME_LOCK:
+            counter = 1
+            while os.path.exists(path):
+                name = f'{base_name}_{counter}.jpg'
+                path = os.path.join(folder, name)
+                counter += 1
+            with urllib.request.urlopen(thumb, timeout=20) as response, open(path, 'wb') as out:
+                shutil.copyfileobj(response, out)
         return send_file(path, as_attachment=True, download_name=name)
     except Exception as e:
         return jsonify(success=False, error=human_error(e)), 500
