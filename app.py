@@ -179,16 +179,13 @@ def node_runtime_options():
 
 
 def network_profiles():
-    # Prefer curl_cffi/Chrome impersonation first. Python's urllib SSL stack
-    # can fail with UNEXPECTED_EOF_WHILE_READING on some YouTube routes.
-    # Keep a plain and IPv4 fallback for networks where impersonation is unavailable.
+    # Do not force a curl_cffi impersonation target here. Some packaged
+    # yt-dlp/curl_cffi combinations raise AssertionError while validating
+    # even a valid target, before a request is sent. Start with yt-dlp's
+    # default HTTP handler, then retry with IPv4 binding for network failures.
     return [
-        # chrome116 is a known Windows target supported by curl_cffi.
-        # Avoid generic "chrome" because newer curl_cffi versions may select
-        # a different OS target, while older/broken bundles may reject it.
-        {'impersonate': 'chrome116'},
-        {'impersonate': 'chrome116', 'source_address': '0.0.0.0'},
         {},
+        {'source_address': '0.0.0.0'},
     ]
 
 
