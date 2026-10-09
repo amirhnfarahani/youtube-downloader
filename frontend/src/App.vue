@@ -22,6 +22,8 @@ const settings = ref({ theme:'dark', download_path:'downloads', concurrent_downl
 const search = ref('')
 const isDark = ref(true)
 let timer
+let clipboardTimer
+let lastClipboardText = ''
 
 const visibleHistory = computed(() => history.value.filter(x => (x.title || '').toLowerCase().includes(search.value.toLowerCase())))
 const runningJobs = computed(() => jobs.value.filter(x => !['completed','error','cancelled'].includes(x.status)))
@@ -71,18 +73,55 @@ async function downloadThumbnail() {
   } catch(e){error.value=e.message}
 }
 
+async function notifyCompleted(previousJobs, currentJobs) {
+  if (!settings.value.notifications || typeof Notification === 'undefined') return
+  if (Notification.permission !== 'granted') return
+  for (const job of currentJobs) {
+    const previous = previousJobs.find(item => item.id === job.id)
+    if (job.status === 'completed' && previous?.status !== 'completed') {
+      try { new Notification('دانلود با موفقیت انجام شد', { body: job.filename || job.message || 'فایل آماده است.' }) } catch {}
+    }
+  }
+}
+
 async function poll() {
   if (!jobs.value.length) return
-  jobs.value = await Promise.all(jobs.value.map(async j => {
-    if (['completed','error','cancelled'].includes(j.status)) return j
+  const previousJobs = jobs.value
+  const updatedJobs = await Promise.all(jobs.value.map(async j => {
+    if (['completed','error','cancelled','deleted'].includes(j.status)) return j
     try { return (await api('/progress/'+j.id)) }
     catch { return j }
   }))
+  jobs.value = updatedJobs
+  await notifyCompleted(previousJobs, updatedJobs)
   const failed = jobs.value.find(j => j.status === 'error')
   if (failed?.error) error.value = failed.error
   if (runningJobs.value.length) timer=setTimeout(poll,800)
 }
 function startPolling(){clearTimeout(timer); poll()}
+
+async function pollClipboard() {
+  if (!settings.value.clipboard_monitor) return
+  try {
+    const clipboard = String((await api('/clipboard')).text || '').trim()
+    if (clipboard && clipboard !== lastClipboardText) {
+      lastClipboardText = clipboard
+      if (!loading.value && /youtube\\.com|youtu\\.be/i.test(clipboard) && clipboard !== url.value.trim()) {
+        url.value = clipboard
+        await inspect()
+      }
+    }
+  } catch {}
+  if (settings.value.clipboard_monitor) clipboardTimer = setTimeout(pollClipboard, 2000)
+}
+
+function syncClipboardMonitor() {
+  clearTimeout(clipboardTimer)
+  if (settings.value.clipboard_monitor) {
+    lastClipboardText = ''
+    pollClipboard()
+  }
+}
 async function cancel(id){ await api('/cancel/'+id,{method:'POST'}); startPolling() }
 async function retry(j){ if(j.url) await startDownload(j.url,j.quality,j.media_type) }
 async function openFile(id){
@@ -110,7 +149,17 @@ async function deletePreset(id){
 }
 async function clearHistory(){ await api('/history',{method:'DELETE'}); await loadHistory() }
 async function deleteHistory(id){ await api('/history/'+id,{method:'DELETE'}); await loadHistory() }
-async function saveSettings(){ await api('/settings',{method:'PUT',body:JSON.stringify(settings.value)}) }
+async function saveSettings(){
+  try {
+    if (settings.value.notifications && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      try { await Notification.requestPermission() } catch {}
+    }
+    const result = await api('/settings',{method:'PUT',body:JSON.stringify(settings.value)})
+    settings.value = {...settings.value, ...result.settings}
+    syncClipboardMonitor()
+    error.value = ''
+  } catch(e) { error.value = e.message }
+}
 function openPresetModal(){
   presetName.value=''
   presetModal.value=true
@@ -178,8 +227,8 @@ async function handlePaste(event){
 }
 function toggleTheme(){isDark.value=!isDark.value; document.documentElement.dataset.theme=isDark.value?'dark':'light'; settings.value.theme=isDark.value?'dark':'light'; saveSettings()}
 
-onMounted(async()=>{ try{const s=await api('/settings');settings.value={...settings.value,...s.settings};isDark.value=settings.value.theme!=='light';document.documentElement.dataset.theme=isDark.value?'dark':'light';await loadHistory();await loadPresets();startPolling()}catch(e){error.value=e.message} })
-onUnmounted(()=>clearTimeout(timer))
+onMounted(async()=>{ try{const s=await api('/settings');settings.value={...settings.value,...s.settings};isDark.value=settings.value.theme!=='light';document.documentElement.dataset.theme=isDark.value?'dark':'light';await loadHistory();await loadPresets();startPolling();syncClipboardMonitor()}catch(e){error.value=e.message} })
+onUnmounted(()=>{clearTimeout(timer);clearTimeout(clipboardTimer)})
 </script>
 
 <template>
