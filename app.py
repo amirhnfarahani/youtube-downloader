@@ -13,6 +13,7 @@ import urllib.request
 from urllib.parse import urlparse
 import sys
 import socket
+import traceback
 
 import yt_dlp
 import pyperclip
@@ -40,6 +41,35 @@ EXECUTOR = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 DOWNLOAD_CONDITION = threading.Condition(JOBS_LOCK)
 ACTIVE_DOWNLOADS = 0
 FILE_NAME_LOCK = threading.Lock()
+
+
+def error_log_path():
+    """Use a writable per-user log location on Windows installations."""
+    if os.name == 'nt':
+        root = os.environ.get('LOCALAPPDATA') or os.environ.get('APPDATA') or BASE_DIR
+        folder = os.path.join(root, 'YouTubeDownloader', 'logs')
+    else:
+        folder = os.path.join(BASE_DIR, 'logs')
+    try:
+        os.makedirs(folder, exist_ok=True)
+        return os.path.join(folder, 'errors.log')
+    except OSError:
+        return os.path.join(BASE_DIR, 'errors.log')
+
+
+def log_exception(context, error):
+    """Persist traceback details so a blank yt-dlp message is diagnosable."""
+    try:
+        detail = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
+        if not detail.strip():
+            detail = f'{type(error).__name__}: {error!r}; args={getattr(error, "args", None)!r}'
+        with open(error_log_path(), 'a', encoding='utf-8') as log:
+            log.write(f'\n[{time.strftime("%Y-%m-%d %H:%M:%S")}] {context}\n')
+            log.write(detail.rstrip() + '\n')
+            log.write('-' * 72 + '\n')
+    except Exception:
+        # Logging must never mask the original application error.
+        pass
 
 
 def db():
@@ -95,6 +125,8 @@ def error_text(error):
     for value in (
         getattr(error, 'msg', None),
         str(error),
+        repr(getattr(error, 'args', None)) if getattr(error, 'args', None) else None,
+        repr(error),
         getattr(getattr(error, 'exc_info', None), 'value', None),
         getattr(error, '__cause__', None),
         getattr(error, '__context__', None),
@@ -273,6 +305,7 @@ def api_info():
         heights = sorted({int(f['height']) for f in formats if f.get('height') and f.get('vcodec') != 'none'}, reverse=True)
         return jsonify(success=True, kind='playlist' if info.get('_type') == 'playlist' else 'video', title=info.get('title'), thumbnail=info.get('thumbnail'), duration=info.get('duration'), uploader=info.get('uploader'), webpage_url=info.get('webpage_url', url), qualities=[{'value': str(h), 'resolution': f'{h}p', 'label': '4K' if h >= 2160 else '2K' if h >= 1440 else 'Full HD' if h >= 1080 else 'HD' if h >= 720 else 'SD'} for h in heights])
     except Exception as e:
+        log_exception('POST /api/info (extract video metadata)', e)
         return jsonify(success=False, error=human_error(e)), 500
 
 
@@ -289,6 +322,7 @@ def api_playlist():
                 entries.append({'index': i, 'id': item.get('id'), 'title': item.get('title'), 'thumbnail': item.get('thumbnail'), 'duration': item.get('duration'), 'url': item.get('webpage_url') or item.get('original_url')})
         return jsonify(success=True, title=info.get('title') or 'Playlist', uploader=info.get('uploader'), count=len(entries), entries=entries)
     except Exception as e:
+        log_exception('POST /api/playlist (extract playlist)', e)
         return jsonify(success=False, error=human_error(e)), 500
 
 
@@ -494,6 +528,7 @@ def run_download(job_id, url, quality, media_type='video'):
                 release_download_slot()
 
     cleanup_job_files(get_settings().get('download_path') or DOWNLOAD_FOLDER, job_id)
+    log_exception(f'download failed; job_id={job_id}; url={url!r}; quality={quality!r}; media_type={media_type!r}', last_error)
     detail = human_error(last_error)
     set_job(job_id, status='error', message=detail, error=detail, raw_error=technical_error(last_error), connection_state='failed')
 
