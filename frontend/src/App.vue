@@ -26,7 +26,7 @@ let clipboardTimer
 let lastClipboardText = ''
 
 const visibleHistory = computed(() => history.value.filter(x => (x.title || '').toLowerCase().includes(search.value.toLowerCase())))
-const runningJobs = computed(() => jobs.value.filter(x => !['completed','error','cancelled'].includes(x.status)))
+const runningJobs = computed(() => jobs.value.filter(x => !['completed','error','cancelled','deleted'].includes(x.status)))
 
 async function api(path, options={}) {
   const res = await fetch(API + path, { headers:{'Content-Type':'application/json'}, ...options })
@@ -106,7 +106,7 @@ async function pollClipboard() {
     const clipboard = String((await api('/clipboard')).text || '').trim()
     if (clipboard && clipboard !== lastClipboardText) {
       lastClipboardText = clipboard
-      if (!loading.value && /youtube\\.com|youtu\\.be/i.test(clipboard) && clipboard !== url.value.trim()) {
+      if (!loading.value && /youtube\.com|youtu\.be/i.test(clipboard) && clipboard !== url.value.trim()) {
         url.value = clipboard
         await inspect()
       }
