@@ -74,6 +74,12 @@ class OutputSelectionTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             downloader.find_output_file(str(self.folder), self.job_id, "video")
 
+    def test_unmerged_video_and_audio_fragments_are_not_selected(self):
+        self.touch("f137.webm", 10)
+        self.touch("f140.m4a", 20)
+        with self.assertRaises(RuntimeError):
+            downloader.find_output_file(str(self.folder), self.job_id, "video")
+
 
 if __name__ == "__main__":
     unittest.main()
