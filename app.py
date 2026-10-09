@@ -64,9 +64,9 @@ def log_exception(context, error):
         if not detail.strip():
             detail = f'{type(error).__name__}: {error!r}; args={getattr(error, "args", None)!r}'
         with open(error_log_path(), 'a', encoding='utf-8') as log:
-            log.write(f'\\n[{time.strftime("%Y-%m-%d %H:%M:%S")}] {context}\\n')
-            log.write(detail.rstrip() + '\\n')
-            log.write('-' * 72 + '\\n')
+            log.write(f'\n[{time.strftime("%Y-%m-%d %H:%M:%S")}] {context}\n')
+            log.write(detail.rstrip() + '\n')
+            log.write('-' * 72 + '\n')
     except Exception:
         # Logging must never mask the original application error.
         pass
