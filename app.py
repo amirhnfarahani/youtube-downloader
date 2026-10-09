@@ -27,7 +27,7 @@ else:
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, 'downloads')
 FRONTEND_DIST = os.path.join(RESOURCE_DIR, 'frontend', 'dist')
 STATIC_FOLDER = os.path.join(RESOURCE_DIR, 'static')
-DB_PATH = os.path.join(BASE_DIR, 'downloader.db')
+DB_PATH = os.environ.get('YTDOWNLOADER_DB_PATH', os.path.join(BASE_DIR, 'downloader.db'))
 BUNDLED_FFMPEG = os.path.join(RESOURCE_DIR, 'ffmpeg.exe')
 BUNDLED_NODE = os.path.join(RESOURCE_DIR, 'node.exe')
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -383,6 +383,21 @@ def cleanup_job_files(folder, job_id):
             pass
 
 
+def find_output_file(folder, job_id, media_type='video'):
+    media_extensions = {'.mp4', '.m4v', '.mkv', '.webm', '.mov', '.avi', '.flv', '.mp3', '.m4a', '.opus', '.wav', '.aac', '.flac', '.ogg'}
+    audio_extensions = {'.mp3', '.m4a', '.opus', '.wav', '.aac', '.flac', '.ogg'}
+    files = [
+        path for path in glob.glob(os.path.join(folder, job_id + '.*'))
+        if os.path.isfile(path)
+        and not path.endswith('.part')
+        and os.path.splitext(path)[1].lower() in media_extensions
+        and (media_type != 'audio' or os.path.splitext(path)[1].lower() in audio_extensions)
+    ]
+    if not files:
+        raise RuntimeError('فایل رسانه خروجی پیدا نشد؛ فایل تصویر بندانگشتی به‌عنوان دانلود پذیرفته نمی‌شود.')
+    return max(files, key=os.path.getmtime)
+
+
 def run_download(job_id, url, quality, media_type='video'):
     event = CANCEL_EVENTS[job_id]
     last_error = None
@@ -440,20 +455,7 @@ def run_download(job_id, url, quality, media_type='video'):
             if last_profile_error is not None:
                 raise last_profile_error
 
-            # yt-dlp may write a thumbnail alongside the media. Never select
-            # that image as the completed download (especially in MP3 mode).
-            media_extensions = {'.mp4', '.m4v', '.mkv', '.webm', '.mov', '.avi', '.flv', '.mp3', '.m4a', '.opus', '.wav', '.aac', '.flac', '.ogg'}
-            audio_extensions = {'.mp3', '.m4a', '.opus', '.wav', '.aac', '.flac', '.ogg'}
-            files = [
-                f for f in glob.glob(os.path.join(folder, job_id + '.*'))
-                if os.path.isfile(f)
-                and not f.endswith('.part')
-                and os.path.splitext(f)[1].lower() in media_extensions
-                and (media_type != 'audio' or os.path.splitext(f)[1].lower() in audio_extensions)
-            ]
-            if not files:
-                raise RuntimeError('فایل رسانه خروجی پیدا نشد؛ فایل تصویر بندانگشتی به‌عنوان دانلود پذیرفته نمی‌شود.')
-            source = max(files, key=os.path.getmtime)
+source = find_output_file(folder, job_id, media_type)
             ext = os.path.splitext(source)[1] or ('.mp3' if media_type == 'audio' else '.mp4')
             base = clean_title(title)
             with FILE_NAME_LOCK:
