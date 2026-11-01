@@ -106,7 +106,7 @@ The downloader uses multiple recovery layers for unstable YouTube connections.
 3. Exponential backoff is used between retry attempts.
 4. yt-dlp is installed with the `curl_cffi` extra for browser-style HTTP/TLS impersonation support.
 5. Windows builds bundle `curl_cffi` and its PyInstaller resources.
-6. The application first tries a Chrome/Windows impersonation profile and then falls back to IPv4/plain networking.
+6. The application first uses yt-dlp's default HTTP handler and then retries with IPv4 source binding for recognized network failures. It does not force a browser impersonation target, avoiding compatibility assertions in some packaged yt-dlp/curl_cffi combinations.
 7. The frontend keeps polling download progress through short API failures.
 8. Stale progress is displayed as a reconnect/retry state instead of immediately appearing frozen.
 9. Common DNS, SSL, connection-reset, timeout, FFmpeg and unavailable-format errors are converted to readable Persian messages.
