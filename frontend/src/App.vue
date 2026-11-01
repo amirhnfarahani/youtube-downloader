@@ -142,6 +142,10 @@ async function deleteFile(id){
   catch(e){ error.value=e.message }
 }
 async function loadHistory(){ history.value=(await api('/history')).items }
+async function loadJobs(){
+  const data = await api('/jobs')
+  jobs.value = Array.isArray(data.items) ? data.items : []
+}
 async function loadPresets(){ presets.value=(await api('/presets')).items }
 async function deletePreset(id){
   try { await api('/presets/'+id,{method:'DELETE'}); await loadPresets() }
@@ -227,7 +231,7 @@ async function handlePaste(event){
 }
 function toggleTheme(){isDark.value=!isDark.value; document.documentElement.dataset.theme=isDark.value?'dark':'light'; settings.value.theme=isDark.value?'dark':'light'; saveSettings()}
 
-onMounted(async()=>{ try{const s=await api('/settings');settings.value={...settings.value,...s.settings};isDark.value=settings.value.theme!=='light';document.documentElement.dataset.theme=isDark.value?'dark':'light';await loadHistory();await loadPresets();startPolling();syncClipboardMonitor()}catch(e){error.value=e.message} })
+onMounted(async()=>{ try{const s=await api('/settings');settings.value={...settings.value,...s.settings};isDark.value=settings.value.theme!=='light';document.documentElement.dataset.theme=isDark.value?'dark':'light';await Promise.all([loadHistory(),loadPresets(),loadJobs()]);startPolling();syncClipboardMonitor()}catch(e){error.value=e.message} })
 onUnmounted(()=>{clearTimeout(timer);clearTimeout(clipboardTimer)})
 </script>
 

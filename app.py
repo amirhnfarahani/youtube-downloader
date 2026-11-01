@@ -208,7 +208,9 @@ def info_options(profile=None):
 
 
 def is_network_error(error):
-    text = str(error or '').lower()
+    # yt-dlp and nested curl/SSL exceptions sometimes have an empty __str__.
+    # Reuse the richer formatter so msg, args, causes and contexts are inspected.
+    text = error_text(error).lower()
     return any(token in text for token in (
         'winerror 10054',
         'connection reset',
@@ -760,7 +762,13 @@ def api_delete_file(job_id):
 
 @app.get('/api/history')
 def api_history():
-    limit = min(int(request.args.get('limit', 100)), 500)
+    # Ignore malformed query values and clamp negative values: SQLite treats a
+    # negative LIMIT as "no limit", which could unexpectedly return the whole DB.
+    try:
+        limit = int(request.args.get('limit', 100))
+    except (TypeError, ValueError):
+        limit = 100
+    limit = max(1, min(limit, 500))
     c = db()
     rows = c.execute('SELECT * FROM history ORDER BY created_at DESC LIMIT ?', (limit,)).fetchall()
     c.close()
