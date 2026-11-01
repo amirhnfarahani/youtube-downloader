@@ -41,6 +41,38 @@ class UrlValidationTests(unittest.TestCase):
         self.assertEqual(invalid_type.status_code, 400)
 
 
+class NetworkErrorDetectionTests(unittest.TestCase):
+    def test_detects_network_errors_when_exception_string_is_empty(self):
+        class EmptyStringNetworkError(Exception):
+            def __str__(self):
+                return ""
+
+        error = EmptyStringNetworkError()
+        error.msg = "SSL: UNEXPECTED_EOF_WHILE_READING"
+        self.assertTrue(downloader.is_network_error(error))
+
+    def test_detects_network_error_in_exception_cause(self):
+        try:
+            try:
+                raise OSError("connection reset by peer")
+            except OSError as cause:
+                raise RuntimeError("request failed") from cause
+        except RuntimeError as error:
+            self.assertTrue(downloader.is_network_error(error))
+
+
+class HistoryLimitTests(unittest.TestCase):
+    def test_invalid_limit_uses_default(self):
+        response = downloader.app.test_client().get("/api/history?limit=invalid")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()["success"])
+
+    def test_negative_limit_is_clamped(self):
+        response = downloader.app.test_client().get("/api/history?limit=-1")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()["success"])
+
+
 class OutputSelectionTests(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
