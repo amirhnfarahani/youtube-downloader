@@ -130,6 +130,8 @@ yt-dlp supports browser impersonation through `curl_cffi`; available impersonati
 
 The project can run as a standalone Windows application instead of requiring the user to open a browser and manually start Flask/Vite.
 
+**Supported operating systems:** Windows 10 and Windows 11.
+
 The Windows build contains:
 
 - PyInstaller-generated `YouTubeDownloader.exe`
