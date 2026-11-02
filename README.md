@@ -1,5 +1,7 @@
 # YouTube Downloader — Vue + Flask + yt-dlp
 
+> **پشتیبانی از ویندوز:** این برنامه برای Windows 10 و Windows 11 پشتیبانی می‌شود.
+
 A modern, responsive and self-hosted YouTube downloader built with **Vue 3**, **Flask**, **yt-dlp**, **FFmpeg** and **SQLite**.
 
 The application has a Persian **RTL** interface, responsive desktop/tablet/mobile layouts, playlist support, download management, persistent history, reusable presets and a dedicated **Windows desktop application** built with PyInstaller and pywebview.
