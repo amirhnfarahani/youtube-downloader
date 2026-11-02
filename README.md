@@ -1,6 +1,6 @@
 # YouTube Downloader — Vue + Flask + yt-dlp
 
-> **پشتیبانی از ویندوز:** این برنامه برای Windows 10 و Windows 11 پشتیبانی می‌شود.
+> **Windows Support:** This application supports Windows 10 and Windows 11.
 
 A modern, responsive and self-hosted YouTube downloader built with **Vue 3**, **Flask**, **yt-dlp**, **FFmpeg** and **SQLite**.
 
